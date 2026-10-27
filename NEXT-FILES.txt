@@ -1,49 +1,9 @@
-ARCHIVED / EXPERIMENTAL INSTRUCTIONS
+ARCHIVED NOTES — DO NOT USE AS BUILD INSTRUCTIONS
 
-These instructions target the older consolidated prototype at the repository root.
-They are not the build or integration path for the active modular kernel in
-kermal/. For the active starter, use: cd kermal && make && make run.
-Do not run the root-level installer scripts against kermal/ source files.
+This file contains obsolete implementation notes from an earlier layout.
+It referenced a kermal/ directory that is not the repository's active build
+path. The authoritative build and file layout are documented in README.md.
 
---- Original experimental notes follow ---
-
-NEXT SOURCE FILES: FATAL CPU EXCEPTION REPORTING
-
-For the standalone integrated source bundle from the immediately preceding
-answer. No GitHub access or repository modification has been performed.
-
-Add exceptions.c, exceptions.s and install_exceptions.py to that directory.
-Run on the build machine:
-  python3 install_exceptions.py
-  make clean
-  make run
-
-The installer backs up kernel.c and Makefile, adds the two build objects,
-and calls exceptions_init() at the beginning of kernel_main().
-
-This adds an x86 IDT, stubs for CPU exceptions 0-31, and a diagnostic screen
-with exception vector, error code, instruction address and code selector.
-The default entry for other vectors halts with vector 255. This is not a
-hardware interrupt driver, scheduler, recovery system or malware detector.
-Interrupts remain disabled. A double-fault stack failure is NOT recoverable
-by this implementation, and faults occurring before IDT setup are not caught.
-The common handler never returns. int3 deliberately stops the kernel too.
-
-Existing file commands remain:
-  mkdir /Documents
-  touch /notes.txt
-  write /notes.txt Hello
-  mv /notes.txt /Documents/
-  mv /Documents/notes.txt /
-  save
-
-After closing/restarting QEMU: load
-Snapshot format is unchanged by this update. save/load remain explicit.
-Use only the dedicated emulator disk, never a physical drive.
-
-OPTIONAL DESTRUCTIVE RUNTIME TEST
-After first verifying a normal boot, a developer can temporarily declare
-extern void exceptions_test(void); in kernel.c and call exceptions_test()
-immediately after exceptions_init(). It should display vector 3 and halt.
-Remove that test call to boot normally. Save work before deliberate crashes.
-The test has not been executed here. No claim of boot verification is made.
+The repository-root Makefile is the integrated build path. Do not run old
+installer scripts or copy source files based on the historical instructions
+below; they may target obsolete source layouts.
