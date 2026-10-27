@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stddef.h>
+#include "heap.h"
 /* Standalone replacement prototype: all runtime modules in one unit. */
 void *memcpy(void *d,const void *s,size_t n){unsigned char *a=d;const unsigned char *b=s;while(n--)*a++=*b++;return d;}
 void *memset(void *d,int v,size_t n){unsigned char *a=d;while(n--)*a++=(unsigned char)v;return d;}
@@ -117,9 +118,18 @@ static int parse(const char *line,char *buf,char **argv){
 static void status(int r){if(r<0)print("Operation failed; check paths, collision, limits, or disk.\n");}
 static int arity(int actual,int expected){if(actual==expected)return 1;print("Wrong argument count. Type help.\n");return 0;}
 void kernel_main(void){
- clear();memset(nodes,0,sizeof nodes);nodes[0].used=nodes[0].dir=1;
+ clear();
+ heap_init();
+ memset(nodes,0,sizeof nodes);nodes[0].used=nodes[0].dir=1;
  print("Kernel ready. Type help. Use load to restore a saved snapshot.\n");
- char line[256],storage[256],text[256];char *args[16];
+ char *line=(char *)heap_alloc(256);
+ char *storage=(char *)heap_alloc(256);
+ char *text=(char *)heap_alloc(256);
+ char *args[16];
+ if(!line||!storage||!text){
+  print("Kernel heap allocation failed.\n");
+  for(;;)__asm__ volatile("cli; hlt");
+ }
  for(;;){unsigned n=0;print("> ");for(;;){char c=keyboard_getchar();if(c=='\n'){put(c);break;}if(c=='\b'){if(n){n--;put(c);}}else if(c>=32&&c<=126&&n<255){line[n++]=c;put(c);}}line[n]=0;
  int argc=parse(line,storage,args);if(argc<0){print("Invalid quotes, escape, or argument limit.\n");continue;}if(!argc)continue;char *cmd=args[0];
  if(eq(cmd,"help")){print("help | clear | pwd | ls [PATH] | cd PATH\nmkdir PATH | touch PATH | write PATH TEXT | cat PATH\nmv SOURCE DEST | cp SOURCE DEST | rm PATH\nsave | load | echo TEXT | halt\nQuote names containing spaces. Save/load are explicit.\n");}
