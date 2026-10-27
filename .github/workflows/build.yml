@@ -48,4 +48,4 @@ jobs:
         run: grub-file --is-x86-multiboot build/kernel.elf
       - name: Verify ISO was created
         working-directory: kermal
-        run: test -s kermal/build/breados.iso
+        run: test -s build/breados.iso
