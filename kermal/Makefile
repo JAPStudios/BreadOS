@@ -29,7 +29,7 @@ $(BUILD):
 	mkdir -p $(BUILD)
 
 $(BUILD)/boot.o: boot.s | $(BUILD)
-	$(AS) -m32 -ffreestanding -fno-pie -c $< -o $@
+	$(CC) -m32 -c $< -o $@
 
 $(BUILD)/kernel.o: kernel.c terminal.h shell.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -55,7 +55,7 @@ $(ISO): $(KERNEL) grub.cfg
 	cp grub.cfg $(ISO_ROOT)/boot/grub/grub.cfg
 	$(GRUB_MKRESCUE) -o $@ $(ISO_ROOT)
 
-run: $(ISO)
+run: check-tools $(ISO)
 	$(QEMU) -cdrom $(ISO) -boot d
 
 clean:
