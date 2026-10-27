@@ -15,7 +15,7 @@ Use the repository-root Makefile. The root build is the only designated integrat
 
 The active build uses the root-level boot.s, kernel.c, linker.ld, grub.cfg, and Makefile, plus kernel/keyboard.c, kernel/keyboard.h, kernel/pmm.c, kernel/pmm.h, heap.c, and heap.h. The separate kernel/shell.c, kernel/shell.h, kernel/terminal.c, and kernel/terminal.h files are preserved source files but are not compiled by the current root Makefile; kernel.c contains the shell and VGA terminal implementation used by the integrated build. These separate shell/terminal files currently implement a smaller command set and must not be treated as active components unless they are deliberately integrated and tested.
 
-The separate ata.c/.h and exceptions.c files are experimental modules and are not linked into the root build. The integrated prototype currently contains its own disk I/O implementation.
+The unintegrated ATA, exception, and shell-parser modules are kept under experimental/modules/, with their standalone tests under experimental/tests/. They are not linked into the root build. The integrated prototype currently contains its own disk I/O implementation. The optional alternate build/ELF inspection scripts are under tools/; the root Makefile remains the authoritative build and test path.
 
 ## Build, test, and run
 
