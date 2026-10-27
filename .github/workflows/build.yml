@@ -30,22 +30,3 @@ jobs:
       - name: Verify ISO was created
         run: test -s starter.iso
 
-  modular-experiment:
-    name: Build modular kernel experiment
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v4
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes gcc-multilib grub-pc-bin grub-common xorriso mtools
-      - name: Build kernel and ISO
-        working-directory: kernel
-        run: make clean all
-      - name: Verify Multiboot header
-        working-directory: kernel
-        run: grub-file --is-x86-multiboot build/kernel.elf
-      - name: Verify ISO was created
-        working-directory: kernel
-        run: test -s build/breados.iso
