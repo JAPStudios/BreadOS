@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdint.h>
+#include "interrupts.h"
 #define W 80
 #define H 25
 #define MB_MAGIC 0x2BADB002u
