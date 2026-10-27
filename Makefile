@@ -58,7 +58,7 @@ run: check-qemu iso disk.img
 	$(QEMU) -m 64 -boot d -cdrom $(ISO) -drive file=disk.img,format=raw,if=ide,index=0,media=disk
 
 host-test: | $(BUILD)
-	$(CC) -std=gnu11 -Wall -Wextra -O2 host_tests.c -o $(BUILD)/host_tests
+	$(CC) -std=gnu11 -fno-builtin -Wall -Wextra -O2 host_tests.c -o $(BUILD)/host_tests
 	$(BUILD)/host_tests
 
 test: host-test
