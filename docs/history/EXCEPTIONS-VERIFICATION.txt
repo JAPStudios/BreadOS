@@ -1,7 +1,0 @@
-Installer syntax check: passed.
-32-bit assembly compile exit code: 0
-
-C host syntax-check exit code: 0
-
-Installer fixture tests: passed; backups preserved and duplicate installation rejected.
-Not tested: complete kernel link, actual IDT loading, exception delivery, QEMU boot, panic screen, save/load. This is source code, not a boot-tested image.

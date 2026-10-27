@@ -1,7 +1,0 @@
-Host compile exit code: 0
-
-Host-test exit code: 0
-PASS: initialization, alignment, allocation, free, invalid/double-free rejection, zeroed allocation, overflow, exhaustion and coalescing.
-
-Installer fixture test: passed. Source and Makefile backups created.
-Not run: cross-compiled full kernel, boot in QEMU, integration in actual project files. Host tests do not prove kernel runtime operation.

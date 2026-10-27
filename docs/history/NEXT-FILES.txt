@@ -1,9 +1,0 @@
-ARCHIVED NOTES — DO NOT USE AS BUILD INSTRUCTIONS
-
-This file contains obsolete implementation notes from an earlier layout.
-It referenced a kermal/ directory that is not the repository's active build
-path. The authoritative build and file layout are documented in README.md.
-
-The repository-root Makefile is the integrated build path. Do not run old
-installer scripts or copy source files based on the historical instructions
-below; they may target obsolete source layouts.

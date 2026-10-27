@@ -1,9 +1,0 @@
-ARCHIVED NOTES — DO NOT USE AS BUILD INSTRUCTIONS
-
-This file describes earlier build-tool experiments for a consolidated source
-bundle. It is not a current implementation plan and should not override the
-repository-root Makefile or README.md.
-
-Use README.md for the current source layout, build commands, and verified
-project status. Do not copy files or run installer scripts based solely on
-the historical instructions that previously followed this notice.
