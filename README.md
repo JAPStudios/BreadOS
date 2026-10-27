@@ -9,7 +9,8 @@ The repository-root source is the integrated prototype and the primary developme
 - `kernel.c`: kernel entry, VGA text console, PS/2 keyboard polling, shell, in-memory file operations, and snapshot persistence to an attached ATA disk.
 - `boot.s`, `linker.ld`, `grub.cfg`: Multiboot v1 startup and image layout.
 - `ata.c/.h`: separate ATA PIO driver module retained for development; the integrated `kernel.c` currently has its own disk I/O implementation.
-- `heap.c/.h`: integrated 64 KiB kernel heap used for shell command buffers and covered by host regression tests. It is not a physical page allocator and does not replace paging.
+- `heap.c/.h`: integrated 64 KiB kernel heap used for shell command buffers and covered by host regression tests.
+- `kernel/pmm.c/.h`: physical page-frame allocator initialized from the GRUB Multiboot v1 memory map, limited to 32-bit physical addresses. Paging and virtual memory are not enabled yet. It is not a physical page allocator and does not replace paging.
 - `exceptions.c`: experimental exception/IDT module, not currently linked into the integrated kernel.
 - `host_tests.c`: host-side regression tests for filesystem operations, path parsing, and snapshot validation.
 - `kernel/`: a separate minimal modular kernel experiment. It is not the integrated prototype's build path.
@@ -36,6 +37,6 @@ These are implemented code paths, not a claim that every command has passed a bo
 
 ## Work still required for the replacement goal
 
-A broad OS replacement requires substantially more than a shell and a small in-memory filesystem. Major missing areas include protected-mode memory management and paging, process/thread scheduling, user/kernel privilege separation, system calls, a real filesystem and storage stack, USB and modern input/display drivers, networking and Wi-Fi, audio, a graphical desktop and touch interface, application/runtime compatibility, security updates, installation/recovery, and support for target architectures and actual phone hardware (including ARM64). These need to be implemented and tested as integrated capabilities before BreadOS can replace Android or desktop operating systems.
+A broad OS replacement requires substantially more than a shell and a small in-memory filesystem. Major missing areas include paging and virtual memory, process/thread scheduling, user/kernel privilege separation, system calls, a real filesystem and storage stack, USB and modern input/display drivers, networking and Wi-Fi, audio, a graphical desktop and touch interface, application/runtime compatibility, security updates, installation/recovery, and support for target architectures and actual phone hardware (including ARM64). These need to be implemented and tested as integrated capabilities before BreadOS can replace Android or desktop operating systems.
 
 The current kernel targets legacy BIOS/GRUB Multiboot v1 and 32-bit x86. It cannot boot as a native Android replacement on an ARM64 phone.

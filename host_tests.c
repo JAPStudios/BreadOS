@@ -2,6 +2,10 @@
 #include <stdio.h>
 #include <string.h>
 #include "kernel.c"
+#include "kernel/pmm.h"
+
+unsigned char __kernel_start[1];
+unsigned char __kernel_end[1];
 #include "heap.h"
 int main(void){
  memset(nodes,0,sizeof nodes);nodes[0].used=nodes[0].dir=1;
@@ -41,5 +45,30 @@ int main(void){
  assert(heap_free(zeroed)<0);
  assert(heap_free((void *)(uintptr_t)1)<0);
  assert(heap_available()==initial_heap);
- puts("PASS: filesystem move/copy/path/snapshot checks; heap alignment, allocation, calloc, invalid/double-free rejection and coalescing.");
+ struct TestMmapEntry {
+  uint32_t size;
+  uint64_t address;
+  uint64_t length;
+  uint32_t type;
+ } __attribute__((packed));
+ const struct TestMmapEntry fake_map[]={
+  {20,0,8u*1024u*1024u,1},
+  {20,8u*1024u*1024u,1u*1024u*1024u,2},
+  {20,9u*1024u*1024u,7u*1024u*1024u,1}
+ };
+ assert(pmm_init_from_memory_map(fake_map,sizeof fake_map,0x00100000u,0x00200000u)==0);
+ assert(pmm_free_pages()==3328u);
+ uintptr_t page=pmm_alloc_page();
+ assert(page==0x00200000u);
+ assert((page&4095u)==0);
+ assert(page<0x00800000u||page>=0x00900000u);
+ assert(pmm_free_pages()==3327u);
+ assert(pmm_free_page(page)==0);
+ assert(pmm_free_pages()==3328u);
+ assert(pmm_free_page(page)<0);
+ assert(pmm_reserve_range(0x00200000u,4096u)==0);
+ assert(pmm_free_pages()==3327u);
+ assert(pmm_free_page(0x00200000u)<0);
+ assert(pmm_free_page(0x00800000u)<0);
+ puts("PASS: filesystem path/move/copy/snapshot; heap allocation/coalescing; PMM map parsing, reserved ranges, allocation and release.");
 }

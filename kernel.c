@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "heap.h"
+#include "kernel/pmm.h"
 /* Standalone replacement prototype: all runtime modules in one unit. */
 void *memcpy(void *d,const void *s,size_t n){unsigned char *a=d;const unsigned char *b=s;while(n--)*a++=*b++;return d;}
 void *memset(void *d,int v,size_t n){unsigned char *a=d;while(n--)*a++=(unsigned char)v;return d;}
@@ -117,8 +118,12 @@ static int parse(const char *line,char *buf,char **argv){
 }
 static void status(int r){if(r<0)print("Operation failed; check paths, collision, limits, or disk.\n");}
 static int arity(int actual,int expected){if(actual==expected)return 1;print("Wrong argument count. Type help.\n");return 0;}
-void kernel_main(void){
+void kernel_main(uint32_t boot_magic,uint32_t boot_info_address){
  clear();
+ if(pmm_init(boot_magic,(uintptr_t)boot_info_address)==0)
+  print("Physical page-frame allocator initialized.\n");
+ else
+  print("Warning: GRUB memory map unavailable; page allocator disabled.\n");
  heap_init();
  memset(nodes,0,sizeof nodes);nodes[0].used=nodes[0].dir=1;
  print("Kernel ready. Type help. Use load to restore a saved snapshot.\n");
