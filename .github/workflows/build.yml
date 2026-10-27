@@ -20,7 +20,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes gcc-multilib grub-pc-bin grub-common xorriso
+          sudo apt-get install --yes gcc-multilib grub-pc-bin grub-common xorriso mtools
       - name: Build integrated kernel and bootable ISO
         run: make clean iso
       - name: Run host regression tests
@@ -39,7 +39,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes gcc-multilib grub-pc-bin grub-common xorriso
+          sudo apt-get install --yes gcc-multilib grub-pc-bin grub-common xorriso mtools
       - name: Build kernel and ISO
         working-directory: kermal
         run: make clean all
