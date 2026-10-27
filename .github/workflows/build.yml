@@ -31,7 +31,7 @@ jobs:
         run: test -s starter.iso
 
   modular-experiment:
-    name: Build modular kermal experiment
+    name: Build modular kernel experiment
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
