@@ -1,38 +1,38 @@
-BREADOS PROJECT STATUS
+BREADOS STATUS
 
-The active starter kernel is the modular source in kermal/. The repository
-root also contains an older, consolidated prototype and experimental scripts.
-Do not combine the two source layouts or treat the root build scripts as the
-build system for kermal/.
+Goal: develop BreadOS into an operating system capable of replacing existing
+operating systems, including Android. Current status: early 32-bit x86
+BIOS/GRUB kernel prototype, not yet a usable general-purpose or phone OS.
 
-ACTIVE STARTER
-  kermal/kernel.c
-  kermal/terminal.c and terminal.h
-  kermal/keyboard.c and keyboard.h
-  kermal/shell.c and shell.h
-  kermal/boot.s
-  kermal/linker.ld
-  kermal/grub.cfg
-  kermal/Makefile
+PRIMARY BUILD PATH (repository root)
+  kernel.c
+  boot.s
+  linker.ld
+  grub.cfg
+  Makefile
+  host_tests.c
 
-BUILD
-  cd kermal
+Build/test/run on Linux with 32-bit GCC support, GNU Make, GRUB BIOS tools,
+xorriso, and QEMU:
   make
+  make test
   make run
 
-Build prerequisites: a Linux toolchain with GCC 32-bit freestanding support,
-GNU Make, GRUB BIOS utilities (grub-file and grub-mkrescue), xorriso, and
-qemu-system-i386. The ISO output is kermal/build/breados.iso.
+The generated ISO is starter.iso. disk.img is a dedicated emulator disk used
+for the prototype's explicit save/load snapshot commands. Never attach a real
+disk to this experimental kernel. make clean preserves disk.img.
 
-The current modular starter targets 32-bit x86, legacy BIOS, GRUB Multiboot v1,
-VGA text output, and polling PS/2 keyboard input. Its shell currently provides
-help, about, clear, and halt.
+The integrated prototype includes a text shell, an in-memory filesystem, and
+explicit ATA snapshot persistence in kernel.c. Host tests cover filesystem
+operations, quoted path parsing, and snapshot validation. These checks do not
+replace a real QEMU boot and command-level test.
 
-This is not yet an Android replacement. It has no ARM/ARM64 phone support,
-touchscreen, graphical desktop, networking, audio, phone power management,
-Android app compatibility, secure app isolation, or phone installation and
-recovery flow. Do not claim those features work until implemented and tested.
+kermal/ is a separate minimal modular kernel experiment, not the integrated
+prototype's build path. heap.c/.h, ata.c/.h, and exceptions.c are separate
+experimental modules not currently linked into the integrated kernel.
 
-The root-level consolidated prototype, test utilities, and instructions are
-retained as historical/experimental material. Their test notes explicitly
-distinguish source-level checks from a real QEMU boot test.
+Major work remains before the replacement goal: paging and memory protection,
+processes and scheduling, privilege separation, syscalls, a production-grade
+filesystem and driver stack, USB, networking/Wi-Fi, audio, graphics/touch,
+application compatibility, security/update infrastructure, installation and
+recovery, and target-specific support including ARM64 phone hardware.
