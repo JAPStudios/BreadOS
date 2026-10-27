@@ -1,3 +1,12 @@
+ARCHIVED / EXPERIMENTAL INSTRUCTIONS
+
+These instructions target the older consolidated prototype at the repository root.
+They are not the build or integration path for the active modular kernel in
+kermal/. For the active starter, use: cd kermal && make && make run.
+Do not run the root-level installer scripts against kermal/ source files.
+
+--- Original experimental notes follow ---
+
 NEXT FILE SET: EXPLICIT SAVE/LOAD FOR THE PREVIOUS RAM FILESYSTEM
 
 Extract these files into the filesystem source directory supplied earlier.
