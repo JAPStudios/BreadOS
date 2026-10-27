@@ -11,7 +11,7 @@ The repository-root source is the integrated prototype and the primary developme
 - `ata.c/.h`: separate ATA PIO driver module retained for development; the integrated `kernel.c` currently has its own disk I/O implementation.
 - `heap.c/.h`, `exceptions.c`: separate experimental modules, not currently linked into the integrated kernel.
 - `host_tests.c`: host-side regression tests for filesystem operations, path parsing, and snapshot validation.
-- `kermal/`: a separate minimal modular kernel experiment. It is not the integrated prototype's build path.
+- `kernel/`: a separate minimal modular kernel experiment. It is not the integrated prototype's build path.
 
 ## Build, test, and run
 
