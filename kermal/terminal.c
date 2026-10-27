@@ -44,21 +44,63 @@ void terminal_initialize(void)
     }
 }
 
+static void terminal_scroll(void)
+{
+    for (size_t y = 1; y < VGA_HEIGHT; y++) {
+        for (size_t x = 0; x < VGA_WIDTH; x++) {
+            terminal_buffer[(y - 1) * VGA_WIDTH + x] =
+                terminal_buffer[y * VGA_WIDTH + x];
+        }
+    }
+
+    const size_t last_row = (VGA_HEIGHT - 1) * VGA_WIDTH;
+    for (size_t x = 0; x < VGA_WIDTH; x++) {
+        terminal_buffer[last_row + x] =
+            make_entry(' ', terminal_color);
+    }
+
+    terminal_row = VGA_HEIGHT - 1;
+}
+
 static void terminal_newline(void)
 {
     terminal_column = 0;
     terminal_row++;
 
     if (terminal_row >= VGA_HEIGHT) {
-        /* Keep the cursor within the visible screen. */
-        terminal_row = VGA_HEIGHT - 1;
+        terminal_scroll();
     }
+}
+
+static void terminal_backspace(void)
+{
+    if (terminal_column == 0) {
+        if (terminal_row == 0) {
+            return;
+        }
+        terminal_row--;
+        terminal_column = VGA_WIDTH;
+    }
+
+    terminal_column--;
+    terminal_buffer[terminal_row * VGA_WIDTH + terminal_column] =
+        make_entry(' ', terminal_color);
 }
 
 void terminal_putchar(char character)
 {
     if (character == '\n') {
         terminal_newline();
+        return;
+    }
+
+    if (character == '\r') {
+        terminal_column = 0;
+        return;
+    }
+
+    if (character == '\b') {
+        terminal_backspace();
         return;
     }
 
