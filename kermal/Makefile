@@ -1,5 +1,4 @@
 CC ?= gcc
-AS ?= gcc
 QEMU ?= qemu-system-i386
 GRUB_FILE ?= grub-file
 GRUB_MKRESCUE ?= grub-mkrescue
@@ -15,7 +14,7 @@ CFLAGS := -m32 -std=gnu11 -ffreestanding -fno-builtin -fno-pie \
           -mno-sse -mno-mmx -Wall -Wextra -O2
 LDFLAGS := -m32 -nostdlib -no-pie -Wl,--build-id=none -Wl,-T,linker.ld
 
-.PHONY: all iso run clean check-tools
+.PHONY: all iso run clean check-tools check-qemu
 
 all: iso
 
@@ -55,7 +54,10 @@ $(ISO): $(KERNEL) grub.cfg
 	cp grub.cfg $(ISO_ROOT)/boot/grub/grub.cfg
 	$(GRUB_MKRESCUE) -o $@ $(ISO_ROOT)
 
-run: check-tools $(ISO)
+check-qemu:
+	@command -v $(QEMU) >/dev/null || { echo "Missing QEMU: $(QEMU)"; exit 1; }
+
+run: check-tools check-qemu $(ISO)
 	$(QEMU) -cdrom $(ISO) -boot d
 
 clean:
