@@ -8,7 +8,7 @@ BUILD := build
 ISO_ROOT := $(BUILD)/iso
 KERNEL := $(BUILD)/kernel.elf
 ISO := starter.iso
-OBJECTS := $(BUILD)/boot.o $(BUILD)/kernel.o
+OBJECTS := $(BUILD)/boot.o $(BUILD)/kernel.o $(BUILD)/keyboard.o
 
 CFLAGS := -m32 -std=gnu11 -march=i686 -ffreestanding -fno-builtin -fno-pie \
           -fno-stack-protector -fno-asynchronous-unwind-tables \
@@ -31,8 +31,11 @@ $(BUILD):
 $(BUILD)/boot.o: boot.s | $(BUILD)
 	$(CC) -m32 -c $< -o $@
 
-$(BUILD)/kernel.o: kernel.c | $(BUILD)
+$(BUILD)/kernel.o: kernel.c kernel/keyboard.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD)/keyboard.o: kernel/keyboard.c kernel/keyboard.h | $(BUILD)
+	$(CC) $(CFLAGS) -c kernel/keyboard.c -o $@
 
 $(KERNEL): $(OBJECTS) linker.ld
 	$(CC) $(LDFLAGS) -o $@ $(OBJECTS)
@@ -58,7 +61,7 @@ run: check-qemu iso disk.img
 	$(QEMU) -m 64 -boot d -cdrom $(ISO) -drive file=disk.img,format=raw,if=ide,index=0,media=disk
 
 host-test: | $(BUILD)
-	$(CC) -std=gnu11 -fno-builtin -Wall -Wextra -O2 host_tests.c -o $(BUILD)/host_tests
+	$(CC) -std=gnu11 -fno-builtin -Wall -Wextra -O2 host_tests.c kernel/keyboard.c -o $(BUILD)/host_tests
 	$(BUILD)/host_tests
 
 test: host-test
