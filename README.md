@@ -9,7 +9,8 @@ The repository-root source is the integrated prototype and the primary developme
 - `kernel.c`: kernel entry, VGA text console, PS/2 keyboard polling, shell, in-memory file operations, and snapshot persistence to an attached ATA disk.
 - `boot.s`, `linker.ld`, `grub.cfg`: Multiboot v1 startup and image layout.
 - `ata.c/.h`: separate ATA PIO driver module retained for development; the integrated `kernel.c` currently has its own disk I/O implementation.
-- `heap.c/.h`, `exceptions.c`: separate experimental modules, not currently linked into the integrated kernel.
+- `heap.c/.h`: integrated 64 KiB kernel heap used for shell command buffers and covered by host regression tests. It is not a physical page allocator and does not replace paging.
+- `exceptions.c`: experimental exception/IDT module, not currently linked into the integrated kernel.
 - `host_tests.c`: host-side regression tests for filesystem operations, path parsing, and snapshot validation.
 - `kernel/`: a separate minimal modular kernel experiment. It is not the integrated prototype's build path.
 
