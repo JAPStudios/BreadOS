@@ -1,0 +1,36 @@
+NEXT FILES: ACTUAL BOOT-AND-FILE-MOVEMENT TEST RUNNER
+
+Place boot_test.py and test_boot_helpers.py in the consolidated source folder.
+This runner targets that specific starter's banners/messages and file commands.
+It does not add commands or establish that an untested kernel works.
+
+Build-host prerequisites: Linux/POSIX host, Python 3, GNU Make, i686-elf GCC
+and binutils, GRUB tools and BIOS modules, xorriso, qemu-system-i386.
+No third-party Python packages required.
+
+Run:
+  python3 boot_test.py
+
+This performs make clean and make iso, then starts headless QEMU with a NEW
+TEMPORARY disk. Existing disk.img is NOT attached or edited. Build outputs
+are regenerated. BOOT-BUILD.log and BOOT-TEST-RESULTS.json are written in the
+project directory. The temporary test disk is removed after the test.
+
+Checks implemented:
+1. Observe kernel startup banner/prompt in VGA memory.
+2. Create a text file and move it into /test.
+3. Read its contents from the new path.
+4. Move it back to root and read it again.
+5. save; close QEMU; start a NEW emulator process on the same temporary disk.
+6. load and check the restored contents.
+
+--skip-build uses an existing starter.iso and does not verify source freshness.
+Do not describe a successful --skip-build run as verifying new source changes.
+The guest save message says disk.img, but the test uses isolated test.img.
+
+A PASS is runtime evidence for only these tested scenarios, not proof of
+security, complete compatibility, general hardware support or production quality.
+Missing prerequisites produce FAIL_OR_NOT_RUN, not PASS. A failure can be in
+the kernel, emulator configuration or test runner; inspect the JSON report.
+The script's full QEMU sequence has not been executed in this environment.
+Helper unit tests alone do not verify booting. See GENERATION-TEST-RESULTS.txt.

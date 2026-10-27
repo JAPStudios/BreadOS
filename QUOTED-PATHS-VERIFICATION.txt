@@ -1,0 +1,11 @@
+Installer Python syntax check: passed.
+Parser/test compile exit code: 0
+
+Test exit code: 0
+PASS: whitespace, normal moves, quoted paths, single quotes, escapes, empty arguments, concatenated quotes, malformed input and capacity boundaries.
+
+Shell syntax check []: 0
+
+Shell syntax check ['-DFS_PERSISTENCE']: 0
+
+Not tested: complete kernel cross-build, actual user project integration, keyboard input in QEMU, boot or persistence hardware I/O.

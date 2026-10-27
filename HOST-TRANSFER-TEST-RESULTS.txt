@@ -1,0 +1,11 @@
+Exit code: 0
+test_collisions_and_cycles (test_disk_tools.DiskTests.test_collisions_and_cycles) ... ok
+test_concurrent_change (test_disk_tools.DiskTests.test_concurrent_change) ... ok
+test_corruption (test_disk_tools.DiskTests.test_corruption) ... ok
+test_invalid_text (test_disk_tools.DiskTests.test_invalid_text) ... ok
+test_roundtrip_move_and_backup (test_disk_tools.DiskTests.test_roundtrip_move_and_backup) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.105s
+
+OK

@@ -1,0 +1,19 @@
+Helper unit-test exit code: 0
+test_bad_length (test_boot_helpers.Helpers.test_bad_length) ... ok
+test_decode (test_boot_helpers.Helpers.test_decode) ... ok
+test_keys (test_boot_helpers.Helpers.test_keys) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.000s
+
+OK
+
+Missing-QEMU failure-path check:
+{
+  "status": "FAIL_OR_NOT_RUN",
+  "checks": [],
+  "scope": "integrated starter only",
+  "error": "Missing qemu-system-i386"
+}
+
+The complete build, QEMU boot, file operations and disk persistence were NOT run here.

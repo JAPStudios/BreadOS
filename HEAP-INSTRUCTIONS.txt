@@ -1,0 +1,48 @@
+NEXT KERNEL COMPONENT: SMALL DYNAMIC-MEMORY ALLOCATOR
+
+Target: the consolidated boot.s/kernel.c/linker.ld/grub.cfg/Makefile source
+bundle from this conversation, with or without the exception-handler update.
+These files do not replace or verify any unknown repository.
+
+Add heap.c, heap.h, install_heap.py to that source directory.
+On the build machine:
+  python3 install_heap.py
+  make clean
+  make run
+
+Installer backs up kernel.c and Makefile, adds heap.o to the link and clean
+rules, adds its compile rule, and calls heap_init() at kernel startup.
+It initializes the allocator but does not rewrite filesystem storage to use it.
+
+Kernel C interface:
+  void *p = heap_alloc(128);
+  if (p) {
+      /* use up to 128 bytes */
+      heap_free(p);
+  }
+
+heap_calloc(count,size) returns zeroed storage and checks multiplication
+overflow. heap_available() reports total currently free payload bytes,
+not the largest contiguous allocation.
+
+Limits: fixed 64 KiB statically reserved arena, 16-byte alignment,
+first-fit allocation, adjacent-free-block coalescing. No paging, physical
+memory discovery, privilege isolation, memory protection, heap growth,
+concurrency protection or malware defense. No general corruption hardening.
+Do not use from concurrent code or interrupt handlers without synchronization.
+heap_init() invalidates all previous heap pointers; call only during startup.
+After successful heap_free(), never read/write the released memory.
+Allocator bookkeeping is NOT kept separate from payload address space.
+
+No new file-moving command is added. The earlier supplied source contains
+mv SOURCE DEST; runtime operation still needs boot verification.
+To move inside the sample after building:
+  mv /notes.txt /Documents/
+  mv /Documents/notes.txt /
+These require the source file and destination directory to exist.
+Use save/load only with the integrated starter's dedicated emulator disk.
+
+Host test:
+  cc -std=c11 -Wall -Wextra -Werror heap.c heap_tests.c -o heap_tests
+  ./heap_tests
+Do not link heap_tests.c into the kernel.

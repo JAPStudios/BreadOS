@@ -1,0 +1,36 @@
+NEXT FILES: FILE AND FOLDER NAMES CONTAINING SPACES
+
+Use with the earlier fs.c/fs.h, terminal, keyboard, boot and build files.
+This is a shell update, not a replacement filesystem or complete OS.
+
+1. Back up shell.c before extracting this update into the project directory.
+2. Replace shell.c; add shell_parse.c, shell_parse.h and the helper script.
+3. Run: python3 install_quoted_shell.py
+4. Run: make clean
+5. Run: make run
+
+Inside the shell:
+  mkdir "/My Documents"
+  touch "/my notes.txt"
+  write "/my notes.txt" "Hello from the file shell"
+  mv "/my notes.txt" "/My Documents/"
+  cat "/My Documents/my notes.txt"
+  mv "/My Documents/my notes.txt" /
+  cp "/my notes.txt" "/My Documents/copy.txt"
+
+The same move works without spaces:
+  mv /notes.txt /Documents/
+  mv /Documents/notes.txt /
+
+The parser supports single quotes, double quotes and backslash escaping
+outside single quotes. It is NOT Bash: there is no variable expansion,
+globbing, redirection, pipes, command substitution, or multiline input.
+Up to 16 arguments and 255 input characters. Filesystem name limits remain.
+
+If the earlier ATA persistence update is detected, save/load remain enabled.
+Otherwise the RAM-only version builds without references to those functions.
+Nothing in this update changes disk snapshot format or saves automatically.
+Existing-destination protection remains in fs_move/fs_copy.
+
+fs_parser_tests.c is a host test, not part of the kernel object list.
+For test results and limitations see QUOTED-PATHS-VERIFICATION.txt.

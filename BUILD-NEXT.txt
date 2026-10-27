@@ -1,0 +1,45 @@
+NEXT FILES: CHECKED BUILD WITHOUT SILENTLY CLAIMING BOOT SUCCESS
+
+Add build_kernel.py and verify_kernel.py to the consolidated source directory.
+These add BUILD TOOLS, not new operating-system runtime features.
+No existing source, Makefile, disk image, or GitHub repository is changed.
+
+BUILD A KERNEL
+  python3 build_kernel.py
+
+The script prefers i686-elf-gcc. If absent, it tries gcc with explicit i686,
+32-bit, freestanding flags. This alternative requires an x86-capable GCC and
+ELF32 linker; it does not work with arbitrary host compilers or Apple clang.
+Compiler/linker errors stop the build. No host libc/startup files are linked.
+Missing compiler helper symbols cause failure instead of using host libraries.
+
+BUILD AN ISO TOO
+  python3 build_kernel.py --iso
+
+Additional ISO requirements: grub-file, grub-mkrescue, GRUB BIOS modules,
+xorriso, grub.cfg. Output directory: build-checked/
+Important outputs: kernel.elf, starter.iso (with --iso), build.log,
+BUILD-RESULTS.json. Scripts never write the previous disk.img.
+
+The validator checks the specific starter's ELF32 x86 executable structure,
+load segments, executable entry point, and Multiboot v1 header/checksum.
+STRUCTURE_PASS means format checks passed, NOT that the kernel boots.
+It deliberately rejects other Multiboot variants or dynamically linked kernels.
+
+Optional heap/exception modules are detected from their integration markers
+in kernel.c. This tool targets the consolidated starter, not arbitrary layouts.
+
+TO USE THE EARLIER BOOT TEST RUNNER ON THIS ISO
+Copy build-checked/starter.iso to starter.iso in the project root, preserving
+any older ISO first, then run:
+  python3 boot_test.py --skip-build
+That runner must be present from its earlier bundle and QEMU installed.
+This procedure does not run automatically and is not verified here.
+
+FILE MOVEMENT IMPLEMENTED IN THE SUPPLIED KERNEL SOURCE
+  mv /notes.txt /Documents/
+  mv /Documents/notes.txt /
+Source file and destination directory must exist; type help for creation.
+These remain implementation examples until runtime testing succeeds.
+
+See BUILD-TOOL-TEST-RESULTS.txt for the exact tests performed here.
