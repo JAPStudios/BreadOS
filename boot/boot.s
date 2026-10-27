@@ -24,11 +24,7 @@ _start:
     cli
     mov $stack_top, %esp
     xor %ebp, %ebp
-    /* Multiboot v1 passes magic in EAX and info pointer in EBX. */
-    push %ebx
-    push %eax
     call kernel_main
-    add $8, %esp
 
 halt:
     cli
