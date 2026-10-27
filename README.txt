@@ -1,18 +1,21 @@
 BREADOS — SOURCE OF TRUTH
 
-Use README.md for the current project status, authoritative build path, file
-layout, commands, and remaining work.
+The active build and source layout are documented in README.md.
 
-The authoritative build path is the repository-root Makefile:
+The build files stay at the repository root:
+  Makefile
+  boot.s
+  kernel.c
+  linker.ld
+  grub.cfg
+
+Reusable kernel modules are under kernel/:
+  keyboard.c / keyboard.h
+  pmm.c / pmm.h
+
+Build and test from the repository root:
   make
   make test
   make run
 
-The older files under kernel/kernel.c, kernel/boot.s, kernel/linker.ld,
-kernel/grub.cfg, kernel/terminal.*, and kernel/shell.* are a separate,
-unbuilt modular-kernel experiment. Do not treat them as part of the root
-integrated kernel. The kernel/keyboard.* and kernel/pmm.* modules are linked
-by the root Makefile.
-
-Only attach disk.img to QEMU. Never attach this experimental disk image to a
-physical drive.
+Only attach disk.img to QEMU. Never attach it to a physical drive.

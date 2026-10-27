@@ -13,7 +13,7 @@ Use the repository-root Makefile. The root build is the only designated integrat
 - heap.c, heap.h: fixed-size kernel heap linked by the root build.
 - host_tests.c: host-side regression tests for file operations, paths, snapshots, heap behavior, and the page-frame allocator.
 
-The directory experimental/modular-kernel/ contains the older, separate modular-kernel experiment, including its own entry point, linker script, GRUB configuration, shell, terminal, and Makefile. It is archived separately and is not built by the root Makefile. The active shared modules remain in kernel/keyboard.c, kernel/keyboard.h, kernel/pmm.c, and kernel/pmm.h. The root Makefile is the only integrated build path.
+The active source layout is intentionally small: boot.s, kernel.c, linker.ld, grub.cfg, and Makefile are at the repository root; the linked reusable modules are kernel/keyboard.c, kernel/keyboard.h, kernel/pmm.c, and kernel/pmm.h. The duplicate modular-kernel entry point, shell, terminal, boot assembly, linker script, GRUB file, and Makefile have been removed from the active source tree. Git history retains earlier versions.
 
 The separate ata.c/.h and exceptions.c files are experimental modules and are not linked into the root build. The integrated prototype currently contains its own disk I/O implementation.
 
