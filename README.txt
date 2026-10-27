@@ -1,60 +1,38 @@
-INTEGRATED OPERATING-SYSTEM STARTER SOURCE
+BREADOS PROJECT STATUS
 
-Extract into a NEW empty directory. This is a standalone consolidated
-prototype, not a patch to any existing project or repository.
-No dependency on previous ZIPs. All runtime C modules are in kernel.c.
+The active starter kernel is the modular source in kermal/. The repository
+root also contains an older, consolidated prototype and experimental scripts.
+Do not combine the two source layouts or treat the root build scripts as the
+build system for kermal/.
 
-Target: 32-bit x86; legacy BIOS; GRUB Multiboot; QEMU i386; VGA text;
-BIOS-initialized emulated PS/2 keyboard; primary-master IDE ATA PIO disk.
-No native UEFI, ARM, AHCI, NVMe, USB, GUI, networking, separate programs,
-process isolation, malware detection, or universal application compatibility.
-It is not the complete operating system described in the funding vision.
+ACTIVE STARTER
+  kermal/kernel.c
+  kermal/terminal.c and terminal.h
+  kermal/keyboard.c and keyboard.h
+  kermal/shell.c and shell.h
+  kermal/boot.s
+  kermal/linker.ld
+  kermal/grub.cfg
+  kermal/Makefile
 
-BUILD PREREQUISITES
-- i686-elf GCC/binutils cross-toolchain
-- GNU Make
-- grub-file, grub-mkrescue and GRUB BIOS modules
-- xorriso
-- qemu-system-i386
-- Python 3
-
-BUILD AND BOOT
+BUILD
+  cd kermal
+  make
   make run
 
-FILE-MOVEMENT DEMONSTRATION (inside the kernel shell)
-  mkdir "/My Documents"
-  touch "/my notes.txt"
-  write "/my notes.txt" "Hello"
-  mv "/my notes.txt" "/My Documents/"
-  ls "/My Documents"
-  cat "/My Documents/my notes.txt"
-  mv "/My Documents/my notes.txt" /
-  cp "/my notes.txt" "/My Documents/copy.txt"
-  save
-  halt
+Build prerequisites: a Linux toolchain with GCC 32-bit freestanding support,
+GNU Make, GRUB BIOS utilities (grub-file and grub-mkrescue), xorriso, and
+qemu-system-i386. The ISO output is kermal/build/breados.iso.
 
-Close QEMU. Run make run again, then enter:
-  load
-  cat "/my notes.txt"
+The current modular starter targets 32-bit x86, legacy BIOS, GRUB Multiboot v1,
+VGA text output, and polling PS/2 keyboard input. Its shell currently provides
+help, about, clear, and halt.
 
-save writes the whole RAM store to disk.img. load replaces live RAM files
-with that snapshot and resets the current directory to /. Save and load
-are explicit; no automatic disk write or startup restore occurs.
+This is not yet an Android replacement. It has no ARM/ARM64 phone support,
+touchscreen, graphical desktop, networking, audio, phone power management,
+Android app compatibility, secure app isolation, or phone installation and
+recovery flow. Do not claim those features work until implemented and tested.
 
-This build uses a NEW snapshot magic value. Do not reuse disk.img from
-earlier prototypes. Preserve old images separately. It cannot import old
-snapshots or files directly from the host computer or GitHub.
-
-LIMITS AND SAFETY
-63 user entries; 31-byte names; 1023-byte text capacity per file; 255-character
-shell input; 16 arguments. cp copies files only. rm refuses nonempty folders
-and current-directory ancestors. Existing destinations are not overwritten.
-Absolute/relative paths, . and .., single/double quotes, backslash escaping
-are implemented. No Bash expansion, pipes, redirection, permissions or ACLs.
-
-Never use a physical disk: code overwrites sector zero and following sectors
-on its selected ATA disk. Only use the dedicated QEMU disk.img.
-Save is NOT crash-atomic; interrupted saving can destroy the old snapshot.
-Keep backups while QEMU is closed. Checksum is not cryptographic protection.
-make clean preserves disk.img. Removing it removes its saved contents.
-Generated source is a development prototype; see VERIFICATION.txt.
+The root-level consolidated prototype, test utilities, and instructions are
+retained as historical/experimental material. Their test notes explicitly
+distinguish source-level checks from a real QEMU boot test.
