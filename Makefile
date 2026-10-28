@@ -4,7 +4,7 @@ LD = ld
 CFLAGS = -m32 -std=gnu11 -ffreestanding -fno-builtin -fno-pie -fno-stack-protector -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -msoft-float -Wall -Wextra -Werror -O2
 LDFLAGS = -m elf_i386 -T linker.ld -nostdlib
 BUILD = build
-.PHONY: all iso run clean
+.PHONY: all iso run test clean
 all: iso
 $(BUILD):
 	mkdir -p $(BUILD)
@@ -27,5 +27,7 @@ $(BUILD)/breados.iso: $(BUILD)/kernel.elf grub.cfg
 iso: $(BUILD)/breados.iso
 run: iso
 	qemu-system-i386 -cdrom $(BUILD)/breados.iso -serial stdio
+test: iso
+	bash tests/boot-smoke.sh
 clean:
 	rm -rf $(BUILD)
