@@ -1,22 +1,14 @@
-# BreadOS
-
-BreadOS is an experimental freestanding 32-bit x86 kernel. It boots through GRUB/Multiboot v1 and currently provides VGA text output, serial diagnostics, a polling legacy PS/2 keyboard shell, CPU exception gates, and a PIT timer interrupt at approximately 100 Hz.
-
-## Build and run
-
-On Debian or Ubuntu:
-
-    sudo apt-get update
-    sudo apt-get install -y build-essential binutils gcc-multilib grub-pc-bin grub-common xorriso mtools qemu-system-x86
-    make clean iso
-    make run
-
-The bootable image is build/breados.iso. In QEMU, the shell currently accepts help, about, clear, reboot, and halt.
-
-## Automated checks
-
-GitHub Actions compiles and links the kernel, validates its Multiboot header, creates the ISO, and boots it briefly in QEMU to verify the serial-console startup message. This is a boot smoke test, not a full hardware or reliability test.
-
-## Scope and limitations
-
-This is not yet a general-purpose operating system and does not replace Android, Windows, macOS, Linux, or other OSes. It currently targets 32-bit x86 PCs and emulators. It does not yet implement paging/virtual memory, user mode, process scheduling, system calls, a persistent filesystem, USB, networking, a complete hardware driver model, a graphics desktop, or application compatibility. The PS/2 keyboard is polled, and only the PIT IRQ is enabled. No physical-hardware compatibility is implied by the CI result.
+Tell me how to get the money for BreadOS developing our not-for-profit competitor against Android, iOS, TiVo, Roku, Amazon Fire, Android TV, Windows, macOS, Debian, Ubuntu, CasaOS, ParrotOS, HexOS, SteamOS, Linux.
+"What will make BreadOS different and better than existing operating systems?"
+Yes, it has the visual appeal of Android, efficiency of Windows, the clearance of macOS, it's compatible with all applications regardless of the operating system they were developed for and offers all of the same customisation as every Linux version.
+"Will BreadOS have real-time threat detection capabilities to identify and neutralize malware?"
+Yes, it wouldn't be able to exist without such.
+"How will you prevent malware designed for one operating system from harming the BreadOS system or other applications?"
+Yes, such things simply would not be authorised.
+Important & Relevant Links
+• YouTube - https://youtube.com/playlist?list=PLFSx5HYOks1tMspqN0ZUi-Sjb21PP_nRe
+Legal & Funding Requirements
+• Cybersecurity & Infrastructure Security Agency - Secure by Design
+• Department of Homeland Security - Cybersecurity and Infrastructure Security Agency
+• Department of Homeland Security - Science and Technology Directorate
+• United States of America - Taylor et al. v. Google LLC Case No. 5:20-cv-07956-VKD
