@@ -4,6 +4,7 @@
 #include "memory.h"
 #include "fs.h"
 #include "paging.h"
+#include "pfs.h"
 #define W 80
 #define H 25
 #define MB_MAGIC 0x2BADB002u
@@ -31,6 +32,11 @@ static void clear(void){for(size_t i=0;i<W*H;i++)vga[i]=0x0F20;row=col=0;}
 static int eq(const char*a,const char*b){while(*a&&*b&&*a==*b){a++;b++;}return *a==*b;}
 static void hex32(uint32_t value){static const char d[]="0123456789ABCDEF";for(int s=28;s>=0;s-=4)put(d[(value>>s)&15u]);}
 static void prompt(void){puts("bread> ");}
+static size_t file_count(void){return pfs_ready()?pfs_count():fs_count();}
+static const char *file_name(size_t i){return pfs_ready()?pfs_name(i):fs_name(i);}
+static int file_read(const char *name,char *out,size_t capacity){return pfs_ready()?pfs_read(name,out,capacity):fs_read(name,out,capacity);}
+static int file_write(const char *name,const char *data){return pfs_ready()?pfs_write(name,data):fs_write(name,data);}
+static int file_remove(const char *name){return pfs_ready()?pfs_remove(name):fs_remove(name);}
 static void command(void){
     line[n]=0;
     puts("\n");
@@ -40,11 +46,12 @@ static void command(void){
     while(*end && *end!=' ')++end;
     char *rest=end;
     if(*end){*end++=0;while(*end==' ')++end;rest=end;}else rest=end;
-    if(eq(arg,"help"))puts("Commands: help, about, memory, ls, cat NAME, write NAME TEXT, rm NAME, clear, reboot, halt\n");
+    if(eq(arg,"help"))puts("Commands: help, about, memory, storage, ls, cat NAME, write NAME TEXT, rm NAME, clear, reboot, halt\n");
     else if(eq(arg,"about"))puts("BreadOS: freestanding 32-bit x86 kernel; Multiboot v1 boot.\n");
     else if(eq(arg,"memory")){puts("Free 4 KiB frames: 0x");hex32(memory_free_frames());puts("\n");}
-    else if(eq(arg,"ls")){for(size_t i=0;i<fs_count();++i){const char *name=fs_name(i);if(name){puts(name);puts("\n");}}}
-    else if(eq(arg,"cat")){char content[FS_DATA_MAX+1u];if(!*rest)puts("Usage: cat NAME\n");else if(fs_read(rest,content,sizeof(content))<0)puts("File not found.\n");else {puts(content);if(content[0]){size_t k=0;while(content[k])++k;if(content[k-1]!='\n')puts("\n");}}}
+    else if(eq(arg,"storage")){if(pfs_ready())puts("Persistent BreadFS on ATA primary-master disk.\n");else puts("Volatile RAM filesystem; no usable BreadFS volume.\n");}
+    else if(eq(arg,"ls")){for(size_t i=0;i<file_count();++i){const char *name=file_name(i);if(name){puts(name);puts("\n");}}}
+    else if(eq(arg,"cat")){char content[FS_DATA_MAX+1u];if(!*rest)puts("Usage: cat NAME\n");else if(file_read(rest,content,sizeof(content))<0)puts("File not found.\n");else {puts(content);if(content[0]){size_t k=0;while(content[k])++k;if(content[k-1]!='\n')puts("\n");}}}
     else if(eq(arg,"write")){char *name=rest;while(*rest && *rest!=' ')++rest;if(*rest){*rest++=0;while(*rest==' ')++rest;if(!*rest)puts("Usage: write NAME TEXT\n");else {int result=fs_write(name,rest);if(result>=0)puts("File written to RAM.\n");else if(result==-2)puts("Error: file content limit is 255 bytes.\n");else if(result==-3)puts("Error: RAM filesystem is full.\n");else puts("Invalid filename. Use letters, numbers, dot, dash, underscore.\n");}}else puts("Usage: write NAME TEXT\n");}
     else if(eq(arg,"rm")){if(!*rest)puts("Usage: rm NAME\n");else if(fs_remove(rest)==0)puts("File removed from RAM.\n");else puts("File not found.\n");}
     else if(eq(arg,"clear"))clear();
