@@ -95,7 +95,7 @@ int ata_init(void) {
     available = 1;
     return 1;
 }
-static int begin_lba28(uint32_t lba, uint8_t command) {
+static int begin_lba28(uint32_t lba) {
     if (!available || lba >= sectors || lba >= ATA_LBA28_MAX) return -1;
     if (wait_not_busy(0) != 0) return -1;
     outb(ATA_DRIVE, (uint8_t)(0xE0u | ((lba >> 24) & 0x0Fu)));
@@ -108,7 +108,7 @@ static int begin_lba28(uint32_t lba, uint8_t command) {
     return 0;
 }
 int ata_read_sector(uint32_t lba, void *buffer) {
-    if (!buffer || begin_lba28(lba, ATA_READ) != 0) return -1;
+    if (!buffer || begin_lba28(lba) != 0) return -1;
     outb(ATA_COMMAND, ATA_READ);
     if (wait_data_request() != 0) return -1;
     uint16_t *words = (uint16_t *)buffer;
@@ -116,7 +116,7 @@ int ata_read_sector(uint32_t lba, void *buffer) {
     return wait_not_busy(0);
 }
 int ata_write_sector(uint32_t lba, const void *buffer) {
-    if (!buffer || begin_lba28(lba, ATA_WRITE) != 0) return -1;
+    if (!buffer || begin_lba28(lba) != 0) return -1;
     outb(ATA_COMMAND, ATA_WRITE);
     if (wait_data_request() != 0) return -1;
     const uint16_t *words = (const uint16_t *)buffer;

@@ -92,7 +92,7 @@ int pfs_init(void) {
         int blank = 1;
         for (size_t i = 0; i < sizeof(sector); ++i)
             if (sector[i] != 0) { blank = 0; break; }
-        if (!blank) return 0; /* Never overwrite an unrecognized disk. */
+        if (!blank) return -1; /* Never overwrite an unrecognized disk. */
         zero_bytes(directory, sizeof(directory));
         if (write_directory() != 0) return 0;
         zero_bytes(&super, sizeof(super));
@@ -112,7 +112,7 @@ int pfs_init(void) {
     }
     if (super.version != PFS_VERSION ||
         super.sector_size != PFS_SECTOR_SIZE ||
-        super.entry_count != FS_MAX_FILES) return 0;
+        super.entry_count != FS_MAX_FILES) return -1;
     if (ata_read_sector(PFS_DIRECTORY_LBA, sector) != 0) return 0;
     copy_bytes(directory, sector, sizeof(directory));
     for (size_t i = 0; i < FS_MAX_FILES; ++i)

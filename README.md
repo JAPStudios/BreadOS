@@ -13,19 +13,14 @@ Legal & Funding Requirements
 • Department of Homeland Security - Science and Technology Directorate
 • United States of America - Taylor et al. v. Google LLC Case No. 5:20-cv-07956-VKD
 
-## Current build and shell capabilities
+## Current implementation and build
 
-BreadOS currently boots as a 32-bit x86 Multiboot kernel in QEMU. The shell supports
-keyboard input, VGA text output with scrolling, serial output, a physical-frame
-allocator, exception/interrupt-controller setup, and a small RAM filesystem.
+BreadOS currently boots as a 32-bit x86 Multiboot kernel in QEMU. It has a VGA text console with scrolling, a polling PS/2 keyboard shell, serial output, a physical-frame allocator, and exception/interrupt-controller setup. Bootstrap paging identity-maps the first 16 MiB with supervisor-only, writable 4 KiB pages; it does not provide separate process address spaces.
 
-RAM filesystem commands:
-- `ls` — list files
-- `cat welcome.txt` — print a file
-- `write notes.txt some text` — create or replace a file (up to 255 bytes)
-- `rm notes.txt` — remove a file
+The shell supports `help`, `about`, `memory`, `storage`, `ls`, `cat NAME`, `write NAME TEXT`, `rm NAME`, `clear`, `reboot`, and `halt`.
 
-Paging currently identity-maps the first 16 MiB with supervisor-only, writable 4 KiB pages. It is an initial kernel mapping, not per-process virtual-memory isolation.\n\nThe RAM filesystem has 16 file slots and is volatile: all files are lost on reboot.
-It is not a disk filesystem and does not yet provide persistent storage, multitasking,
-virtual-memory isolation, networking, graphics acceleration, or compatibility layers.
-Build and boot-test with `make clean test`; run interactively with `make run`.
+When a primary-master IDE disk is present, the ATA PIO driver provides polling sector reads and writes. BreadFS v1 persists up to 16 named files, each up to 255 bytes, using a fixed on-disk directory and one 512-byte sector per file. A zero-filled disk image is initialized automatically on first boot. A disk with an unrecognized nonzero first sector is left unchanged; file commands then use the RAM filesystem. BreadFS is an early development filesystem without journaling, directories, or recovery tools. It is not compatible with FAT, ext4, NTFS, APFS, or other existing filesystem formats.
+
+Build and boot-test with `make clean test`; run interactively with `make run`. The QEMU smoke test boots twice against the same image and checks that BreadFS is formatted on first boot and mounted on the second.
+
+BreadOS is not yet a replacement for Android, iOS, Windows, macOS, Linux distributions, or TV operating systems. Major missing subsystems include user-mode execution and process isolation, scheduling and multitasking, broader hardware drivers, networking, a graphical compositor and input stack, audio/video, power management, and application compatibility layers. Security enforcement and malware detection must be implemented and tested rather than assumed.

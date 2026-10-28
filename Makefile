@@ -36,7 +36,8 @@ $(BUILD)/breados.iso: $(BUILD)/kernel.elf grub.cfg
 	grub-mkrescue -o $@ $(BUILD)/iso
 iso: $(BUILD)/breados.iso
 run: iso
-	qemu-system-i386 -cdrom $(BUILD)/breados.iso -serial stdio
+	test -f $(BUILD)/breados-disk.img || truncate -s 16M $(BUILD)/breados-disk.img
+	qemu-system-i386 -drive file=$(BUILD)/breados-disk.img,format=raw,if=ide,index=0 -cdrom $(BUILD)/breados.iso -serial stdio
 test: iso
 	bash tests/boot-smoke.sh
 clean:
