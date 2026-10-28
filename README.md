@@ -17,7 +17,7 @@ Legal & Funding Requirements
 
 BreadOS currently boots as a 32-bit x86 Multiboot kernel in QEMU. It has a VGA text console with scrolling, a polling PS/2 keyboard shell, serial output, a physical-frame allocator, and exception/interrupt-controller setup. Bootstrap paging identity-maps the first 16 MiB with supervisor-only, writable 4 KiB pages; it does not provide separate process address spaces.
 
-The shell supports `help`, `about`, `memory`, `storage`, `ls`, `cat NAME`, `write NAME TEXT`, `rm NAME`, `clear`, `reboot`, and `halt`.
+The PIT is programmed to generate a 100 Hz timer interrupt; IRQ0 increments a tick counter, exposed by the `uptime` command. This is timer infrastructure, not yet a process scheduler. The shell supports `help`, `about`, `memory`, `storage`, `uptime`, `ls`, `cat NAME`, `write NAME TEXT`, `rm NAME`, `clear`, `reboot`, and `halt`.
 
 When a primary-master IDE disk is present, the ATA PIO driver provides polling sector reads and writes. BreadFS v1 persists up to 16 named files, each up to 255 bytes, using a fixed on-disk directory and one 512-byte sector per file. A zero-filled disk image is initialized automatically on first boot. A disk with an unrecognized nonzero first sector is left unchanged; file commands then use the RAM filesystem. BreadFS is an early development filesystem without journaling, directories, or recovery tools. It is not compatible with FAT, ext4, NTFS, APFS, or other existing filesystem formats.
 

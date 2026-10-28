@@ -7,6 +7,10 @@
 #define PIC1_DATA 0x21
 #define PIC2_COMMAND 0xA0
 #define PIC2_DATA 0xA1
+#define PIT_CHANNEL0 0x40
+#define PIT_COMMAND 0x43
+#define PIT_HZ 100u
+#define PIT_INPUT_HZ 1193182u
 
 struct idt_entry {
     uint16_t offset_low;
@@ -52,8 +56,8 @@ static void pic_remap(void) {
     outb(PIC1_DATA, 0x20); outb(PIC2_DATA, 0x28);
     outb(PIC1_DATA, 0x04); outb(PIC2_DATA, 0x02);
     outb(PIC1_DATA, 0x01); outb(PIC2_DATA, 0x01);
-    /* Keep every hardware IRQ masked until its handler is validated. */
-    outb(PIC1_DATA, 0xFF); outb(PIC2_DATA, 0xFF);
+    /* Enable only IRQ0 (PIT timer); keep every other hardware IRQ masked. */
+    outb(PIC1_DATA, 0xFE); outb(PIC2_DATA, 0xFF);
 }
 void interrupts_init(void) {
     void (*const exceptions[32])(void) = {
@@ -68,8 +72,12 @@ void interrupts_init(void) {
     struct idt_pointer p = { (uint16_t)(sizeof(idt)-1), (uint32_t)(uintptr_t)idt };
     pic_remap();
     lidt(&p);
-    /* Polling shell is stable with interrupts disabled; enable IRQs only after
-       all handlers and exception paths have been validated. */
+    /* Program PIT channel 0 for 100 Hz, then enable the validated IRQ0 path. */
+    uint16_t divisor = (uint16_t)(PIT_INPUT_HZ / PIT_HZ);
+    outb(PIT_COMMAND, 0x36);
+    outb(PIT_CHANNEL0, (uint8_t)(divisor & 0xFFu));
+    outb(PIT_CHANNEL0, (uint8_t)(divisor >> 8));
+    __asm__ volatile ("sti" : : : "memory");
 }
 uint32_t timer_ticks(void) { return ticks; }
 static void serial_char(char c) {

@@ -9,6 +9,7 @@
 #define H 25
 #define MB_MAGIC 0x2BADB002u
 #define COM1 0x3F8
+extern uint32_t timer_ticks(void);
 static volatile uint16_t *const vga=(volatile uint16_t*)0xB8000;
 static size_t row,col,n;
 static char line[128];
@@ -46,11 +47,11 @@ static void command(void){
     while(*end && *end!=' ')++end;
     char *rest=end;
     if(*end){*end++=0;while(*end==' ')++end;rest=end;}else rest=end;
-    if(eq(arg,"help"))puts("Commands: help, about, memory, storage, ls, cat NAME, write NAME TEXT, rm NAME, clear, reboot, halt\n");
+    if(eq(arg,"help"))puts("Commands: help, about, memory, storage, uptime, ls, cat NAME, write NAME TEXT, rm NAME, clear, reboot, halt\n");
     else if(eq(arg,"about"))puts("BreadOS: freestanding 32-bit x86 kernel; Multiboot v1 boot.\n");
     else if(eq(arg,"memory")){puts("Free 4 KiB frames: 0x");hex32(memory_free_frames());puts("\n");}
     else if(eq(arg,"storage")){if(pfs_ready())puts("Persistent BreadFS on ATA primary-master disk.\n");else puts("Volatile RAM filesystem; no usable BreadFS volume.\n");}
-    else if(eq(arg,"storage")){if(pfs_ready())puts("Persistent BreadFS on ATA primary-master disk.\n");else puts("Volatile RAM filesystem; no usable BreadFS volume.\n");}
+    else if(eq(arg,"uptime")){puts("PIT ticks at 100 Hz: ");hex32(timer_ticks());puts("\n");}
     else if(eq(arg,"ls")){for(size_t i=0;i<file_count();++i){const char *name=file_name(i);if(name){puts(name);puts("\n");}}}
     else if(eq(arg,"cat")){char content[FS_DATA_MAX+1u];if(!*rest)puts("Usage: cat NAME\n");else if(file_read(rest,content,sizeof(content))<0)puts("File not found.\n");else {puts(content);if(content[0]){size_t k=0;while(content[k])++k;if(content[k-1]!='\n')puts("\n");}}}
     else if(eq(arg,"write")){char *name=rest;while(*rest && *rest!=' ')++rest;if(*rest){*rest++=0;while(*rest==' ')++rest;if(!*rest)puts("Usage: write NAME TEXT\n");else {int result=file_write(name,rest);if(result>=0){if(pfs_ready())puts("File written to disk.\n");else puts("File written to RAM.\n");}else if(result==-2)puts("Error: file content limit is 255 bytes.\n");else if(result==-3)puts("Error: RAM filesystem is full.\n");else puts("Invalid filename. Use letters, numbers, dot, dash, underscore.\n");}}else puts("Usage: write NAME TEXT\n");}
