@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include "interrupts.h"
 #include "memory.h"
+#include "memory.h"
 #define W 80
 #define H 25
 #define MB_MAGIC 0x2BADB002u
@@ -16,6 +17,7 @@ static void put(char c){if(c=='\n'){col=0;if(++row>=H)row=0;}else if(c=='\b'){if
 static void puts(const char*s){while(*s)put(*s++);}
 static void clear(void){for(size_t i=0;i<W*H;i++)vga[i]=0x0F20;row=col=0;}
 static int eq(const char*a,const char*b){while(*a&&*b&&*a==*b){a++;b++;}return *a==*b;}
+static void hex32(uint32_t value){static const char d[]="0123456789ABCDEF";for(int s=28;s>=0;s-=4)put(d[(value>>s)&15u]);}
 static void hex32(uint32_t value){static const char d[]="0123456789ABCDEF";for(int s=28;s>=0;s-=4)put(d[(value>>s)&15u]);}
 static void prompt(void){puts("bread> ");}
 static void command(void){line[n]=0;puts("\n");if(eq(line,"help"))puts("Commands: help, about, clear, reboot, halt\n");else if(eq(line,"about"))puts("BreadOS: freestanding 32-bit x86 kernel; Multiboot v1 boot.\n");else if(eq(line,"clear"))clear();else if(eq(line,"reboot")){puts("Rebooting...\n");__asm__ volatile("cli");uint8_t s=0x02;while(s&2)s=inb(0x64);outb(0x64,0xFE);for(;;)__asm__ volatile("hlt");}else if(eq(line,"halt")){puts("CPU halted. Reset the VM to continue.\n");__asm__ volatile("cli");for(;;)__asm__ volatile("hlt");}else if(n)puts("Unknown command. Type help.\n");n=0;prompt();}

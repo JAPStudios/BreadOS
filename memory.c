@@ -89,11 +89,4 @@ void memory_free_frame(uint32_t address) {
     if (bitmap[f>>5] & (1u<<(f&31u))) mark_free(f);
 }
 uint32_t memory_free_frames(void) { return free_count; }
-uint32_t memory_total_frames(void) {
-    uint32_t used=0;
-    for (uint32_t i=0;i<BITMAP_WORDS;i++) {
-        uint32_t v=bitmap[i];
-        while (v) { v &= v-1u; used++; }
-    }
-    return FRAME_COUNT-used;
-}
+uint32_t memory_total_frames(void) { return FRAME_COUNT; }
