@@ -25,7 +25,7 @@ RAM filesystem commands:
 - `write notes.txt some text` — create or replace a file (up to 255 bytes)
 - `rm notes.txt` — remove a file
 
-The RAM filesystem has 16 file slots and is volatile: all files are lost on reboot.
+Paging currently identity-maps the first 16 MiB with supervisor-only, writable 4 KiB pages. It is an initial kernel mapping, not per-process virtual-memory isolation.\n\nThe RAM filesystem has 16 file slots and is volatile: all files are lost on reboot.
 It is not a disk filesystem and does not yet provide persistent storage, multitasking,
 virtual-memory isolation, networking, graphics acceleration, or compatibility layers.
 Build and boot-test with `make clean test`; run interactively with `make run`.

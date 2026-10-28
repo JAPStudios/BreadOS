@@ -3,6 +3,7 @@
 #include "interrupts.h"
 #include "memory.h"
 #include "fs.h"
+#include "paging.h"
 #define W 80
 #define H 25
 #define MB_MAGIC 0x2BADB002u
@@ -53,4 +54,4 @@ static void command(void){
     n=0;prompt();
 }
 static const char *keys[128]={[0x02]="1",[0x03]="2",[0x04]="3",[0x05]="4",[0x06]="5",[0x07]="6",[0x08]="7",[0x09]="8",[0x0A]="9",[0x0B]="0",[0x0C]="-",[0x0D]="=",[0x0E]="\b",[0x10]="q",[0x11]="w",[0x12]="e",[0x13]="r",[0x14]="t",[0x15]="y",[0x16]="u",[0x17]="i",[0x18]="o",[0x19]="p",[0x1A]="[",[0x1B]="]",[0x1C]="\n",[0x1E]="a",[0x1F]="s",[0x20]="d",[0x21]="f",[0x22]="g",[0x23]="h",[0x24]="j",[0x25]="k",[0x26]="l",[0x27]=";",[0x28]="'",[0x2B]="\\",[0x2C]="z",[0x2D]="x",[0x2E]="c",[0x2F]="v",[0x30]="b",[0x31]="n",[0x32]="m",[0x33]=",",[0x34]=".",[0x35]="/",[0x39]=" "};
-void kernel_main(uint32_t magic,uint32_t mbi){serial_init();clear();puts("BreadOS kernel starting...\n");if(magic!=MB_MAGIC){puts("ERROR: invalid Multiboot magic; halted.\n");for(;;)__asm__ volatile("cli; hlt");}puts("Boot OK. VGA console and PS/2 keyboard shell ready.\n");memory_init(mbi);puts("Physical frame allocator initialized.\n");fs_init();puts("RAM filesystem initialized. Type help for commands.\n");interrupts_init();prompt();for(;;){if(!(inb(0x64)&1)){__asm__ volatile("pause");continue;}uint8_t sc=inb(0x60);if(sc&0x80)continue;if(sc==0x1C){command();continue;}if(sc==0x0E){if(n){n--;put('\b');put(' ');put('\b');}continue;}if(sc<128&&keys[sc]&&keys[sc][0]&&n<sizeof(line)-1){char c=keys[sc][0];line[n++]=c;put(c);}}}
+void kernel_main(uint32_t magic,uint32_t mbi){serial_init();clear();puts("BreadOS kernel starting...\n");if(magic!=MB_MAGIC){puts("ERROR: invalid Multiboot magic; halted.\n");for(;;)__asm__ volatile("cli; hlt");}puts("Boot OK. VGA console and PS/2 keyboard shell ready.\n");memory_init(mbi);puts("Physical frame allocator initialized.\n");paging_init();puts("Paging enabled: first 16 MiB identity-mapped.\n");fs_init();puts("RAM filesystem initialized. Type help for commands.\n");interrupts_init();prompt();for(;;){if(!(inb(0x64)&1)){__asm__ volatile("pause");continue;}uint8_t sc=inb(0x60);if(sc&0x80)continue;if(sc==0x1C){command();continue;}if(sc==0x0E){if(n){n--;put('\b');put(' ');put('\b');}continue;}if(sc<128&&keys[sc]&&keys[sc][0]&&n<sizeof(line)-1){char c=keys[sc][0];line[n++]=c;put(c);}}}
