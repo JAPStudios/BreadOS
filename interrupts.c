@@ -7,8 +7,6 @@
 #define PIC1_DATA 0x21
 #define PIC2_COMMAND 0xA0
 #define PIC2_DATA 0xA1
-#define PIT_COMMAND 0x43
-#define PIT_CHANNEL0 0x40
 
 struct idt_entry {
     uint16_t offset_low;
@@ -56,13 +54,6 @@ static void pic_remap(void) {
     outb(PIC1_DATA, 0x01); outb(PIC2_DATA, 0x01);
     /* Keep every hardware IRQ masked until its handler is validated. */
     outb(PIC1_DATA, 0xFF); outb(PIC2_DATA, 0xFF);
-}
-static void pit_init(void) {
-    /* PIT input clock ~1,193,182 Hz; divisor 11932 gives ~100 Hz. */
-    uint16_t divisor = 11932;
-    outb(PIT_COMMAND, 0x36);
-    outb(PIT_CHANNEL0, (uint8_t)(divisor & 0xFF));
-    outb(PIT_CHANNEL0, (uint8_t)(divisor >> 8));
 }
 void interrupts_init(void) {
     void (*const exceptions[32])(void) = {
