@@ -12,3 +12,20 @@ Legal & Funding Requirements
 • Department of Homeland Security - Cybersecurity and Infrastructure Security Agency
 • Department of Homeland Security - Science and Technology Directorate
 • United States of America - Taylor et al. v. Google LLC Case No. 5:20-cv-07956-VKD
+
+## Current build and shell capabilities
+
+BreadOS currently boots as a 32-bit x86 Multiboot kernel in QEMU. The shell supports
+keyboard input, VGA text output with scrolling, serial output, a physical-frame
+allocator, exception/interrupt-controller setup, and a small RAM filesystem.
+
+RAM filesystem commands:
+- `ls` — list files
+- `cat welcome.txt` — print a file
+- `write notes.txt some text` — create or replace a file (up to 255 bytes)
+- `rm notes.txt` — remove a file
+
+The RAM filesystem has 16 file slots and is volatile: all files are lost on reboot.
+It is not a disk filesystem and does not yet provide persistent storage, multitasking,
+virtual-memory isolation, networking, graphics acceleration, or compatibility layers.
+Build and boot-test with `make clean test`; run interactively with `make run`.
