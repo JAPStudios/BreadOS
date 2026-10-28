@@ -12,7 +12,26 @@ static char line[128];
 static inline void outb(uint16_t p,uint8_t v){__asm__ volatile("outb %0,%1"::"a"(v),"Nd"(p));}
 static inline uint8_t inb(uint16_t p){uint8_t v;__asm__ volatile("inb %1,%0":"=a"(v):"Nd"(p));return v;}
 static void serial_init(void){outb(COM1+1,0);outb(COM1+3,0x80);outb(COM1,3);outb(COM1+1,0);outb(COM1+3,3);outb(COM1+2,0xC7);outb(COM1+4,0x0B);}
-static void put(char c){if(c=='\n'){col=0;if(++row>=H)row=0;}else if(c=='\b'){if(col)col--;}else{vga[row*W+col]=(uint16_t)c|0x0F00;if(++col>=W){col=0;if(++row>=H)row=0;}}for(unsigned i=0;i<100000;i++)if(inb(COM1+5)&0x20){outb(COM1,c);break;}}
+static void put(char c){
+    if(c=='\n'){col=0;if(++row>=H)row=0;}
+    else if(c=='\r'){col=0;}
+    else if(c=='\b'){if(col)col--;}
+    else {vga[row*W+col]=(uint16_t)c|0x0F00;if(++col>=W){col=0;if(++row>=H)row=0;}}
+    for(unsigned i=0;i<100000;i++)if(inb(COM1+5)&0x20){outb(COM1,c);break;}
+}
+static void newline(void){put('\r');put('\n');}
+static void scroll(void){
+    for(size_t y=1;y<H;y++)for(size_t x=0;x<W;x++)vga[(y-1)*W+x]=vga[y*W+x];
+    for(size_t x=0;x<W;x++)vga[(H-1)*W+x]=0x0F20;
+    row=H-1;
+}
+static void terminal_put(char c){
+    if(c=='\n'){col=0;if(++row>=H)scroll();return;}
+    if(c=='\r'){col=0;return;}
+    if(c=='\b'){if(col)col--;return;}
+    vga[row*W+col]=(uint16_t)c|0x0F00;
+    if(++col>=W){col=0;if(++row>=H)scroll();}
+}
 static void puts(const char*s){while(*s)put(*s++);}
 static void clear(void){for(size_t i=0;i<W*H;i++)vga[i]=0x0F20;row=col=0;}
 static int eq(const char*a,const char*b){while(*a&&*b&&*a==*b){a++;b++;}return *a==*b;}
