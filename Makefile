@@ -10,7 +10,9 @@ $(BUILD):
 	mkdir -p $(BUILD)
 $(BUILD)/boot.o: boot.s | $(BUILD)
 	$(AS) --32 $< -o $@
-$(BUILD)/memory.o: memory.c memory.h | $(BUILD)\n\t$(CC) $(CFLAGS) -c $< -o $@\n$(BUILD)/kernel.o: kernel.c memory.h | $(BUILD)
+$(BUILD)/memory.o: memory.c memory.h | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+$(BUILD)/kernel.o: kernel.c memory.h interrupts.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/interrupts.o: interrupts.s | $(BUILD)
 	$(AS) --32 $< -o $@
