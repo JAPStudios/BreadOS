@@ -81,17 +81,36 @@ void interrupts_init(void) {
     __asm__ volatile ("sti" : : : "memory");
 }
 uint32_t timer_ticks(void) { return ticks; }
-static void fatal_exception(uint32_t vector) {
+static void serial_char(char c) {
+    /* COM1 is initialized by kernel_main before interrupts are enabled. */
+    for (unsigned wait=0; wait<1000000; ++wait) {
+        uint8_t status;
+        __asm__ volatile ("inb %1, %0" : "=a"(status) : "Nd"((uint16_t)0x3FD));
+        if (status & 0x20) {
+            __asm__ volatile ("outb %0, %1" : : "a"((uint8_t)c), "Nd"((uint16_t)0x3F8));
+            return;
+        }
+    }
+}
+static void serial_text(const char *s) { while (*s) serial_char(*s++); }
+static void serial_hex(uint32_t value) {
+    static const char digits[] = "0123456789ABCDEF";
+    for (int shift=28; shift>=0; shift-=4) serial_char(digits[(value >> shift) & 0xF]);
+}
+static void fatal_exception(uint32_t vector, uint32_t error_code) {
     volatile uint16_t *vga=(volatile uint16_t *)0xB8000;
     const char *msg="BreadOS fatal CPU exception; halted.";
     for (unsigned i=0;msg[i] && i<80;i++) vga[i]=(uint16_t)(uint8_t)msg[i] | 0x4F00;
-    (void)vector;
+    serial_text("FATAL CPU exception vector=0x");
+    serial_hex(vector);
+    serial_text(" error=0x");
+    serial_hex(error_code);
+    serial_text("\r\n");
     __asm__ volatile ("cli");
     for (;;) __asm__ volatile ("hlt");
 }
 void interrupt_handler(uint32_t vector, uint32_t error_code) {
-    (void)error_code;
-    if (vector < 32) fatal_exception(vector);
+    if (vector < 32) fatal_exception(vector, error_code);
     if (vector == 32) {
         ticks++;
         outb(PIC1_COMMAND, 0x20);
