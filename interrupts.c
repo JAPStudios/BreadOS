@@ -54,8 +54,8 @@ static void pic_remap(void) {
     outb(PIC1_DATA, 0x20); outb(PIC2_DATA, 0x28);
     outb(PIC1_DATA, 0x04); outb(PIC2_DATA, 0x02);
     outb(PIC1_DATA, 0x01); outb(PIC2_DATA, 0x01);
-    /* Enable only IRQ0 (PIT); mask all other hardware IRQs for now. */
-    outb(PIC1_DATA, 0xFE); outb(PIC2_DATA, 0xFF);
+    /* Keep every hardware IRQ masked until its handler is validated. */
+    outb(PIC1_DATA, 0xFF); outb(PIC2_DATA, 0xFF);
 }
 static void pit_init(void) {
     /* PIT input clock ~1,193,182 Hz; divisor 11932 gives ~100 Hz. */
@@ -77,8 +77,8 @@ void interrupts_init(void) {
     struct idt_pointer p = { (uint16_t)(sizeof(idt)-1), (uint32_t)(uintptr_t)idt };
     pic_remap();
     lidt(&p);
-    pit_init();
-    __asm__ volatile ("sti" : : : "memory");
+    /* Polling shell is stable with interrupts disabled; enable IRQs only after
+       all handlers and exception paths have been validated. */
 }
 uint32_t timer_ticks(void) { return ticks; }
 static void serial_char(char c) {
