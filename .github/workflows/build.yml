@@ -15,20 +15,7 @@ jobs:
       - name: Verify Multiboot header
         run: grub-file --is-x86-multiboot build/kernel.elf
       - name: Boot smoke test in QEMU
-        shell: bash
-        run: |
-          set +e
-          timeout 8s qemu-system-i386 -display none -monitor none -no-reboot -serial stdio -cdrom build/breados.iso > build/qemu-serial.log 2>&1
-          status=$?
-          set -e
-          if [ "$status" -ne 124 ]; then
-            cat build/qemu-serial.log
-            echo "QEMU exited unexpectedly with status $status"
-            exit 1
-          fi
-          grep -F "BreadOS kernel starting..." build/qemu-serial.log
-          grep -F "Boot OK. VGA console and PS/2 keyboard shell ready." build/qemu-serial.log
-          grep -F "bread>" build/qemu-serial.log
+        run: make test
       - uses: actions/upload-artifact@v4
         with:
           name: breados-bootable-iso
