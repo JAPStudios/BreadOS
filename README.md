@@ -24,3 +24,29 @@ When a primary-master IDE disk is present, the ATA PIO driver provides polling s
 Build and boot-test with `make clean test`; run interactively with `make run`. The QEMU smoke test boots twice against the same image and checks that BreadFS is formatted on first boot and mounted on the second.
 
 BreadOS is not yet a replacement for Android, iOS, Windows, macOS, Linux distributions, or TV operating systems. Major missing subsystems include user-mode execution and process isolation, scheduling and multitasking, broader hardware drivers, networking, a graphical compositor and input stack, audio/video, power management, and application compatibility layers. Security enforcement and malware detection must be implemented and tested rather than assumed.
+
+
+## Reproducible Docker build and smoke test
+
+Docker is a development environment for building and testing BreadOS; it is not the operating system that BreadOS runs on. The container installs the compiler, GRUB/ISO tools, and QEMU needed by this repository.
+
+Install Docker Engine and the Docker Compose plugin for the host operating system using Docker's official installation instructions: https://docs.docker.com/engine/install/ . Then, from the repository root, run:
+
+```bash
+docker compose build
+docker compose run --rm breados-test
+```
+
+The second command runs `make clean test` inside the container. It passes only if the build and the existing QEMU serial smoke test succeed. The container workflow is intended for automated build/test, not for replacing the host OS or providing a graphical desktop. For an interactive QEMU session, use the host's QEMU installation and run `make run` from the repository root.
+
+On an Ubuntu/Debian host without Docker, the corresponding dependencies are:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential gcc-multilib binutils make grub-common grub-pc-bin xorriso mtools qemu-system-x86
+make clean test
+```
+
+## Replacement scope
+
+The Docker workflow does not make BreadOS a replacement for Android, iOS, Windows, macOS, Linux distributions, or TV operating systems. That requires a functioning user-space ABI and process loader, memory isolation, scheduler, system-call interface, drivers, networking, graphics/input/audio/video stacks, power management, application ports or compatibility runtimes, and security controls with tests. Those are separate implementation projects; the existing kernel and filesystem are an early bootable foundation, not a complete general-purpose OS. No compatibility or malware-neutralization claim should be made until the corresponding implementation and tests exist.
