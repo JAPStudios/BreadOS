@@ -11,7 +11,6 @@ static int shift_down;
 static int caps_lock;
 static int extended_scancode;
 
-/* US-layout Set 1 key maps. Values are ASCII code points; zero means unmapped. */
 static const uint8_t keymap[128] = {
     [0x02]=49,[0x03]=50,[0x04]=51,[0x05]=52,[0x06]=53,[0x07]=54,
     [0x08]=55,[0x09]=56,[0x0A]=57,[0x0B]=48,[0x0C]=45,[0x0D]=61,
@@ -45,18 +44,21 @@ int keyboard_process_scancode(uint8_t scancode, char *out) {
         extended_scancode = 0;
         return 0;
     }
-    if (scancode == 0x2Au || scancode == 0x36u) {
-        shift_down = (scancode & 0x80u) == 0;
-        return 0;
-    }
-    if (scancode == 0x3Au) {
-        caps_lock = !caps_lock;
-        return 0;
-    }
-    if (scancode & 0x80u) return 0;
 
-    uint8_t normal = keymap[scancode];
-    uint8_t shifted = shifted_keymap[scancode];
+    uint8_t key = (uint8_t)(scancode & 0x7Fu);
+    int released = (scancode & 0x80u) != 0;
+    if (key == 0x2Au || key == 0x36u) {
+        shift_down = !released;
+        return 0;
+    }
+    if (key == 0x3Au) {
+        if (!released) caps_lock = !caps_lock;
+        return 0;
+    }
+    if (released) return 0;
+
+    uint8_t normal = keymap[key];
+    uint8_t shifted = shifted_keymap[key];
     if (normal >= 'a' && normal <= 'z') {
         int uppercase = shift_down ^ caps_lock;
         *out = uppercase ? (char)(normal - 'a' + 'A') : (char)normal;
