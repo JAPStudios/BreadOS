@@ -18,6 +18,7 @@ grep -F "Boot OK. VGA console and PS/2 keyboard shell ready." build/qemu-serial.
 grep -F "Paging enabled: first 16 MiB identity-mapped." build/qemu-serial.log
 grep -F "Persistent BreadFS formatted and mounted." build/qemu-serial.log
 grep -F "bread>" build/qemu-serial.log
+grep -F "Scheduler smoke test passed: round-robin task switching verified." build/qemu-serial.log
 # Boot a second time without replacing the image; the volume must mount, not format.
 set +e
 timeout 8s qemu-system-i386 -display none -monitor none -no-reboot -no-shutdown -serial stdio \
