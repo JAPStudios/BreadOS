@@ -1,4 +1,5 @@
 #include "interrupts.h"
+#include "task.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -108,10 +109,12 @@ static void fatal_exception(uint32_t vector, uint32_t error_code) {
     __asm__ volatile ("cli");
     for (;;) __asm__ volatile ("hlt");
 }
-void interrupt_handler(uint32_t vector, uint32_t error_code) {
+uint32_t *interrupt_handler(uint32_t vector, uint32_t error_code, uint32_t *frame) {
     if (vector < 32) fatal_exception(vector, error_code);
     if (vector == 32) {
         ticks++;
         outb(PIC1_COMMAND, 0x20);
+        return task_schedule(frame);
     }
+    return frame;
 }

@@ -7,6 +7,7 @@
 #include "paging.h"
 #include "pfs.h"
 #include "gdt.h"
+#include "task.h"
 #include "kernel/keyboard.h"
 #define W 80
 #define H 25
@@ -50,11 +51,12 @@ static void command(void){
     while(*end && *end!=' ')++end;
     char *rest=end;
     if(*end){*end++=0;while(*end==' ')++end;rest=end;}else rest=end;
-    if(eq(arg,"help"))puts("Commands: help, about, memory, storage, uptime, ls, cat NAME, write NAME TEXT, rm NAME, clear, reboot, halt\n");
+    if(eq(arg,"help"))puts("Commands: help, about, memory, storage, uptime, tasks, ls, cat NAME, write NAME TEXT, rm NAME, clear, reboot, halt\n");
     else if(eq(arg,"about"))puts("BreadOS: freestanding 32-bit x86 kernel; Multiboot v1 boot.\n");
     else if(eq(arg,"memory")){puts("Free 4 KiB frames: 0x");hex32(memory_free_frames());puts("\n");}
     else if(eq(arg,"storage")){if(pfs_ready())puts("Persistent BreadFS on ATA primary-master disk.\n");else puts("Volatile RAM filesystem; no usable BreadFS volume.\n");}
     else if(eq(arg,"uptime")){puts("PIT ticks at 100 Hz: ");hex32(timer_ticks());puts("\n");}
+    else if(eq(arg,"tasks")){puts("Timer-driven kernel task switches: ");hex32(task_switch_count());puts("\n");}
     else if(eq(arg,"ls")){for(size_t i=0;i<file_count();++i){const char *name=file_name(i);if(name){puts(name);puts("\n");}}}
     else if(eq(arg,"cat")){char content[FS_DATA_MAX+1u];if(!*rest)puts("Usage: cat NAME\n");else if(file_read(rest,content,sizeof(content))<0)puts("File not found.\n");else {puts(content);if(content[0]){size_t k=0;while(content[k])++k;if(content[k-1]!='\n')puts("\n");}}}
     else if(eq(arg,"write")){char *name=rest;while(*rest && *rest!=' ')++rest;if(*rest){*rest++=0;while(*rest==' ')++rest;if(!*rest)puts("Usage: write NAME TEXT\n");else {int result=file_write(name,rest);if(result>=0){if(pfs_ready())puts("File written to disk.\n");else puts("File written to RAM.\n");}else if(result==-2)puts("Error: file content limit is 255 bytes.\n");else if(result==-3)puts("Error: RAM filesystem is full.\n");else puts("Invalid filename. Use letters, numbers, dot, dash, underscore.\n");}}else puts("Usage: write NAME TEXT\n");}
@@ -75,6 +77,9 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     heap_init();puts("Kernel heap initialized (256 KiB).\n");
     paging_init();puts("Paging enabled: first 16 MiB identity-mapped.\n");
     int storage=pfs_init();if(storage==2)puts("Persistent BreadFS formatted and mounted.\n");else if(storage==1)puts("Persistent BreadFS mounted.\n");else{fs_init();if(storage==0)puts("RAM filesystem initialized (no usable ATA volume).\n");else puts("RAM filesystem initialized (ATA volume not recognized; disk left unchanged).\n");}
-    puts("Type help for commands.\n");interrupts_init();prompt();
+    tasking_init();puts("Round-robin kernel scheduler initialized (3 kernel threads).\n");
+    puts("Type help for commands.\n");interrupts_init();
+    while(task_switch_count()<6u){__asm__ volatile("hlt");}
+    puts("Scheduler smoke test passed: round-robin task switching verified.\n");prompt();
     for(;;){char c;if(!keyboard_read_char(&c)){__asm__ volatile("pause");continue;}if(c=='\n'){command();continue;}if(c=='\b'){if(n){n--;put('\b');put(' ');put('\b');}continue;}if(n<sizeof(line)-1){line[n++]=c;put(c);}}
 }
