@@ -1,6 +1,7 @@
 CC = gcc
 AS = as
 LD = ld
+HOSTCC ?= cc
 CFLAGS = -m32 -std=gnu11 -ffreestanding -fno-builtin -fno-pie -fno-stack-protector -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -msoft-float -Wall -Wextra -Werror -O2
 LDFLAGS = -m elf_i386 -T linker.ld -nostdlib
 BUILD = build
@@ -42,11 +43,14 @@ $(BUILD)/breados.iso: $(BUILD)/kernel.elf grub.cfg
 	cp $(BUILD)/kernel.elf $(BUILD)/iso/boot/kernel.elf
 	cp grub.cfg $(BUILD)/iso/boot/grub/grub.cfg
 	grub-mkrescue -o $@ $(BUILD)/iso
+$(BUILD)/filesystem-host-test: tests/filesystem-host.c fs.c pfs.c fs.h pfs.h ata.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/filesystem-host.c fs.c pfs.c -o $@
 iso: $(BUILD)/breados.iso
 run: iso
 	test -f $(BUILD)/breados-disk.img || truncate -s 16M $(BUILD)/breados-disk.img
 	qemu-system-i386 -drive file=$(BUILD)/breados-disk.img,format=raw,if=ide,index=0 -cdrom $(BUILD)/breados.iso -serial stdio
-test: iso
+test: iso $(BUILD)/filesystem-host-test
+	$(BUILD)/filesystem-host-test
 	bash tests/boot-smoke.sh
 clean:
 	rm -rf $(BUILD)
