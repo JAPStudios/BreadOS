@@ -1,0 +1,21 @@
+name: BreadOS build and smoke test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-smoke-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Build development image
+        run: docker build --tag breados-ci .
+      - name: Build ISO and run QEMU smoke test
+        run: docker run --rm breados-ci
