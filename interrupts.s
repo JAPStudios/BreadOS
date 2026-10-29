@@ -47,6 +47,7 @@ ISR_NOERR 28
 ISR_ERR   29
 ISR_ERR   30
 ISR_NOERR 31
+ISR_NOERR 128
 .global irq0
 irq0:
     pushl $0
