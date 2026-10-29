@@ -7,7 +7,7 @@
 #include "paging.h"
 #include "pfs.h"
 #include "gdt.h"
-#include "kernel/drivers/keyboard.h"
+#include "kernel/keyboard.h"
 #define W 80
 #define H 25
 #define MB_MAGIC 0x2BADB002u
