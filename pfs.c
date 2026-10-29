@@ -38,6 +38,7 @@ static size_t string_length(const char *s) {
     return n;
 }
 static int same(const char *a, const char *b) {
+    if (!a || !b) return 0;
     while (*a && *b && *a == *b) { ++a; ++b; }
     return *a == *b;
 }
@@ -64,6 +65,7 @@ static int valid_name(const char *name) {
     return 1;
 }
 static int find(const char *name) {
+    if (!name) return -1;
     for (size_t i = 0; i < FS_MAX_FILES; ++i)
         if (directory[i].used && same(directory[i].name, name)) return (int)i;
     return -1;
@@ -77,7 +79,18 @@ static int write_directory(void) {
 static int valid_entry(const struct pfs_entry *entry) {
     if (entry->used > 1u) return 0;
     if (!entry->used) return 1;
-    if (entry->size > FS_DATA_MAX || !valid_name(entry->name)) return 0;
+
+    /* Disk data is untrusted: require a terminator inside the fixed name field
+       before any string helper is allowed to read it. */
+    int terminated = 0;
+    for (size_t i = 0; i < sizeof(entry->name); ++i) {
+        if (entry->name[i] == '\0') {
+            terminated = 1;
+            break;
+        }
+    }
+    if (!terminated || entry->size > FS_DATA_MAX ||
+        !valid_name(entry->name)) return 0;
     return 1;
 }
 int pfs_init(void) {
@@ -142,8 +155,9 @@ const char *pfs_name(size_t index) {
     return (const char *)0;
 }
 int pfs_read(const char *name, char *out, size_t capacity) {
+    if (!ready || !name || !out || capacity == 0) return -1;
     int slot = find(name);
-    if (!ready || slot < 0 || !out || capacity == 0) return -1;
+    if (slot < 0) return -1;
     uint8_t sector[PFS_SECTOR_SIZE];
     if (ata_read_sector(PFS_DATA_LBA + (uint32_t)slot, sector) != 0) return -1;
     size_t n = directory[slot].size;
@@ -180,7 +194,7 @@ int pfs_write(const char *name, const char *data) {
     return (int)n;
 }
 int pfs_remove(const char *name) {
-    if (!ready) return -1;
+    if (!ready || !name) return -1;
     int slot = find(name);
     if (slot < 0) return -1;
     struct pfs_entry previous = directory[slot];
