@@ -10,10 +10,10 @@ BreadOS is an experimental, freestanding 32-bit x86 operating-system kernel. It 
 - A physical frame bitmap initialized from the Multiboot memory map. Allocation is intentionally restricted to the first 16 MiB because that is the only region currently identity-mapped.
 - A fixed 256 KiB kernel heap.
 - Bootstrap paging with a writable, supervisor-only identity map of the first 16 MiB. This is not process isolation or a complete virtual-memory subsystem.
-- A small RAM filesystem and a simple fixed-sector BreadFS v1 filesystem over primary-master ATA PIO. BreadFS supports 16 named files, up to 255 bytes each; it is not a general-purpose filesystem.
+- A small RAM filesystem and a simple fixed-sector BreadFS v1 filesystem over primary-master ATA PIO. Both support directory paths and file moves, but remain limited to 16 total file/directory entries, 15 characters per path, and 255 bytes per file; BreadFS is not a general-purpose filesystem.
 - Serial console output for boot diagnostics and a QEMU smoke test.
 
-The shell currently provides `help`, `about`, `memory`, `storage`, `uptime`, `ls`, `cat NAME`, `write NAME TEXT`, `rm NAME`, `clear`, `reboot`, and `halt`.
+The shell currently provides `help`, `about`, `memory`, `storage`, `uptime`, `tasks`, `ls`, `mkdir PATH`, `rmdir PATH`, `cat PATH`, `write PATH TEXT`, `mv SOURCE DEST`, `rm PATH`, `clear`, `reboot`, and `halt`. Paths are relative to the root (there is no current-directory command yet). Example: `mkdir docs`, `write docs/note.txt hello`, `mv docs/note.txt note.txt`, `cat note.txt`, `rmdir docs`.
 
 ## Build requirements
 
@@ -53,7 +53,7 @@ The paging implementation maps only the first 16 MiB. The physical frame allocat
 - `memory.c`, `paging.c`, `heap.c`: physical-frame tracking, bootstrap paging, and heap.
 - `gdt.c`, `gdt_load.s`, `interrupts.c`, `interrupts.s`: segmentation and interrupt setup.
 - `kernel/keyboard.c`: PS/2 Set 1 keyboard translation and polling.
-- `fs.c`, `pfs.c`, `ata.c`: RAM filesystem, BreadFS, and ATA PIO driver.
+- `fs.c`, `pfs.c`, `ata.c`: RAM filesystem, BreadFS directory/path handling, and ATA PIO driver.
 - `tests/filesystem-host.c`, `tests/keyboard-host.c`: host-side regression tests.
 - `tests/boot-smoke.sh`: QEMU serial boot smoke test.
 - `.github/workflows/build.yml`: CI build and smoke test.
