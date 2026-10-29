@@ -10,6 +10,7 @@ static struct fs_entry entries[FS_MAX_FILES];
 static size_t used_count;
 
 static int same(const char *a, const char *b) {
+    if (!a || !b) return 0;
     while (*a && *b && *a == *b) { ++a; ++b; }
     return *a == *b;
 }
@@ -21,6 +22,7 @@ static size_t length(const char *s) {
 }
 
 static int valid_name(const char *name) {
+    if (!name) return 0;
     size_t n = length(name);
     if (n == 0 || n > FS_NAME_MAX) return 0;
     for (size_t i = 0; i < n; ++i) {
@@ -34,6 +36,7 @@ static int valid_name(const char *name) {
 }
 
 static int find(const char *name) {
+    if (!name) return -1;
     for (size_t i = 0; i < FS_MAX_FILES; ++i)
         if (entries[i].used && same(entries[i].name, name)) return (int)i;
     return -1;
