@@ -210,6 +210,7 @@ int pfs_write(const char *path, const char *data) {
     if (n > FS_DATA_MAX) return -2;
     int slot = find(path);
     if (slot >= 0 && directory[slot].reserved != 0u) return -1;
+    if (find_dir(path) >= 0) return -1;
     if (slot < 0) slot = free_slot();
     if (slot < 0) return -3;
     uint8_t sector[PFS_SECTOR_SIZE];
