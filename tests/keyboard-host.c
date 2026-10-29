@@ -13,13 +13,15 @@ static void expect_no_char(unsigned code) {
 }
 
 int main(void) {
-    expect_char(0x1E, 'a');       /* a */
+    expect_char(0x1E, 'a');
     expect_no_char(0xAA);         /* left shift release must not stick */
     expect_no_char(0x2A);         /* left shift down */
     expect_char(0x1E, 'A');
     expect_no_char(0x9E);         /* a release */
     expect_no_char(0xAA);         /* left shift up */
+    expect_no_char(0x2A);         /* shift down again */
     expect_char(0x02, '!');       /* shifted number-row punctuation */
+    expect_no_char(0xAA);         /* shift up */
     expect_no_char(0x3A);         /* Caps Lock on */
     expect_char(0x1E, 'A');
     expect_no_char(0xBA);         /* Caps Lock release does not toggle */
