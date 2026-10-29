@@ -72,6 +72,7 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     gdt_init();
     puts("GDT installed; TSS loaded for future ring-3 execution.\n");
     memory_init(mbi);puts("Physical frame allocator initialized.\n");
+    heap_init();puts("Kernel heap initialized (256 KiB).\n");
     paging_init();puts("Paging enabled: first 16 MiB identity-mapped.\n");
     int storage=pfs_init();if(storage==2)puts("Persistent BreadFS formatted and mounted.\n");else if(storage==1)puts("Persistent BreadFS mounted.\n");else{fs_init();if(storage==0)puts("RAM filesystem initialized (no usable ATA volume).\n");else puts("RAM filesystem initialized (ATA volume not recognized; disk left unchanged).\n");}
     puts("Type help for commands.\n");interrupts_init();prompt();
