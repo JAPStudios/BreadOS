@@ -7,6 +7,7 @@
 #define BLOCK_MAGIC 0xB4EAD05Au
 #define BLOCK_FREE 1u
 #define BLOCK_USED 2u
+#define HEAP_HEADER_SIZE ((sizeof(struct heap_block) + HEAP_ALIGNMENT - 1u) & ~(size_t)(HEAP_ALIGNMENT - 1u))
 
 struct heap_block {
     size_t size;                 /* payload bytes, excluding this header */
@@ -39,7 +40,7 @@ static void unlock_interrupts(uint32_t flags) {
 void heap_init(void) {
     uint32_t flags = lock_interrupts();
     first = (struct heap_block *)(void *)arena;
-    first->size = HEAP_CAPACITY - sizeof(*first);
+    first->size = HEAP_CAPACITY - HEAP_HEADER_SIZE;
     first->magic = BLOCK_MAGIC;
     first->state = BLOCK_FREE;
     first->previous = 0;
@@ -50,13 +51,13 @@ void heap_init(void) {
 }
 
 static void split_block(struct heap_block *block, size_t requested) {
-    if (block->size < requested + sizeof(struct heap_block) + HEAP_ALIGNMENT)
+    if (block->size < requested + HEAP_HEADER_SIZE + HEAP_ALIGNMENT)
         return;
 
-    uint8_t *payload = (uint8_t *)(void *)(block + 1);
+    uint8_t *payload = (uint8_t *)(void *)block + HEAP_HEADER_SIZE;
     struct heap_block *remainder =
         (struct heap_block *)(void *)(payload + requested);
-    remainder->size = block->size - requested - sizeof(*remainder);
+    remainder->size = block->size - requested - HEAP_HEADER_SIZE;
     remainder->magic = BLOCK_MAGIC;
     remainder->state = BLOCK_FREE;
     remainder->previous = block;
@@ -68,11 +69,11 @@ static void split_block(struct heap_block *block, size_t requested) {
 }
 
 void *heap_alloc(size_t size) {
-    if (!initialized || size == 0 || size > HEAP_CAPACITY - sizeof(struct heap_block))
+    if (!initialized || size == 0 || size > HEAP_CAPACITY - HEAP_HEADER_SIZE ||
+        size > (size_t)-1 - (HEAP_ALIGNMENT - 1u))
         return 0;
 
     size = align_up(size);
-    if (size < align_up(size)) return 0;
 
     uint32_t flags = lock_interrupts();
     for (struct heap_block *block = first; block; block = block->next) {
@@ -84,7 +85,7 @@ void *heap_alloc(size_t size) {
             split_block(block, size);
             block->state = BLOCK_USED;
             used_bytes += block->size;
-            void *result = (void *)(block + 1);
+            void *result = (uint8_t *)(void *)block + HEAP_HEADER_SIZE;
             unlock_interrupts(flags);
             return result;
         }
@@ -107,14 +108,14 @@ void heap_free(void *pointer) {
     if (!pointer || !initialized) return;
 
     uintptr_t address = (uintptr_t)pointer;
-    uintptr_t start = (uintptr_t)arena + sizeof(struct heap_block);
+    uintptr_t start = (uintptr_t)arena + HEAP_HEADER_SIZE;
     uintptr_t end = (uintptr_t)arena + sizeof(arena);
     if (address < start || address >= end ||
-        ((address - (uintptr_t)arena - sizeof(struct heap_block)) % HEAP_ALIGNMENT) != 0)
+        ((address - (uintptr_t)arena - HEAP_HEADER_SIZE) % HEAP_ALIGNMENT) != 0)
         return;
 
     uint32_t flags = lock_interrupts();
-    struct heap_block *block = (struct heap_block *)pointer - 1;
+    struct heap_block *block = (struct heap_block *)(void *)((uint8_t *)pointer - HEAP_HEADER_SIZE);
     if (block->magic != BLOCK_MAGIC || block->state != BLOCK_USED ||
         (uint8_t *)(void *)block < arena ||
         (uint8_t *)(void *)block >= arena + sizeof(arena)) {
@@ -129,14 +130,14 @@ void heap_free(void *pointer) {
     if (block->next && block->next->magic == BLOCK_MAGIC &&
         block->next->state == BLOCK_FREE) {
         struct heap_block *next = block->next;
-        block->size += sizeof(*next) + next->size;
+        block->size += HEAP_HEADER_SIZE + next->size;
         block->next = next->next;
         if (block->next) block->next->previous = block;
     }
     if (block->previous && block->previous->magic == BLOCK_MAGIC &&
         block->previous->state == BLOCK_FREE) {
         struct heap_block *previous = block->previous;
-        previous->size += sizeof(*block) + block->size;
+        previous->size += HEAP_HEADER_SIZE + block->size;
         previous->next = block->next;
         if (previous->next) previous->next->previous = previous;
     }
