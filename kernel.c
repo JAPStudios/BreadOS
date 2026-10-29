@@ -8,6 +8,7 @@
 #include "pfs.h"
 #include "gdt.h"
 #include "task.h"
+#include "syscall.h"
 #include "kernel/keyboard.h"
 #define W 80
 #define H 25
