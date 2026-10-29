@@ -5,8 +5,9 @@ BreadOS is an experimental, freestanding 32-bit x86 operating-system kernel. It 
 ## Current implementation
 
 - Multiboot v1 boot through GRUB, with a VGA text console and a polling PS/2 keyboard shell.
+- US keyboard input with Shift and Caps Lock; extended navigation keys are not implemented.
 - GDT setup, a TSS, IDT exception stubs, a remapped PIC, and a 100 Hz PIT tick counter.
-- A physical frame allocator initialized from the Multiboot memory map.
+- A physical frame bitmap initialized from the Multiboot memory map. Allocation is intentionally restricted to the first 16 MiB because that is the only region currently identity-mapped.
 - A fixed 256 KiB kernel heap.
 - Bootstrap paging with a writable, supervisor-only identity map of the first 16 MiB. This is not process isolation or a complete virtual-memory subsystem.
 - A small RAM filesystem and a simple fixed-sector BreadFS v1 filesystem over primary-master ATA PIO. BreadFS supports 16 named files, up to 255 bytes each; it is not a general-purpose filesystem.
@@ -31,7 +32,7 @@ make test
 make run
 ```
 
-The build produces `build/kernel.elf` and `build/breados.iso`. `make test` boots the ISO in QEMU and checks the serial boot messages and that a newly initialized disk is mounted on the following boot. This is a smoke test, not proof of full hardware compatibility or complete OS behavior.
+The build produces `build/kernel.elf` and `build/breados.iso`. `make test` runs host-side filesystem and keyboard regression tests, then boots the ISO in QEMU and checks serial startup output and persistence across two boots. These are smoke/regression tests, not proof of full hardware compatibility or complete OS behavior.
 
 ## Disk safety
 
@@ -43,7 +44,7 @@ BreadFS initializes a disk only when its first sector is blank. If the first sec
 
 BreadOS does not yet provide user-mode processes, system calls, scheduling, privilege-isolated address spaces, a complete virtual-memory manager, a general-purpose on-disk filesystem, USB support, networking, Wi-Fi, audio, a graphical desktop, application compatibility, secure updates, or Android/ARM64 hardware support. The TSS and user-mode GDT entries are setup groundwork only; user-mode execution is not implemented.
 
-The paging implementation maps only the first 16 MiB. Physical memory allocations must not be treated as generally dereferenceable virtual addresses outside that map. The heap is a fixed, single-core arena and is not backed by the physical frame allocator.
+The paging implementation maps only the first 16 MiB. The physical frame allocator therefore refuses to allocate frames outside that mapped region. The heap is a fixed, single-core arena and is not backed by the physical frame allocator.
 
 ## Project structure
 
@@ -51,8 +52,9 @@ The paging implementation maps only the first 16 MiB. Physical memory allocation
 - `kernel.c`: kernel initialization and command shell.
 - `memory.c`, `paging.c`, `heap.c`: physical-frame tracking, bootstrap paging, and heap.
 - `gdt.c`, `gdt_load.s`, `interrupts.c`, `interrupts.s`: segmentation and interrupt setup.
-- `kernel/keyboard.c`: PS/2 Set 1 keyboard polling.
+- `kernel/keyboard.c`: PS/2 Set 1 keyboard translation and polling.
 - `fs.c`, `pfs.c`, `ata.c`: RAM filesystem, BreadFS, and ATA PIO driver.
+- `tests/filesystem-host.c`, `tests/keyboard-host.c`: host-side regression tests.
 - `tests/boot-smoke.sh`: QEMU serial boot smoke test.
 - `.github/workflows/build.yml`: CI build and smoke test.
 
