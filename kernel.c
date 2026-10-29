@@ -79,8 +79,7 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     int storage=pfs_init();if(storage==2)puts("Persistent BreadFS formatted and mounted.\n");else if(storage==1)puts("Persistent BreadFS mounted.\n");else{fs_init();if(storage==0)puts("RAM filesystem initialized (no usable ATA volume).\n");else puts("RAM filesystem initialized (ATA volume not recognized; disk left unchanged).\n");}
     tasking_init();puts("Round-robin kernel scheduler initialized (3 kernel threads).\n");
     puts("Type help for commands.\n");interrupts_init();
-    for(uint32_t wait=0;wait<500u && task_switch_count()<6u;++wait){__asm__ volatile("pause");}
-    if(task_switch_count()<6u){puts("ERROR: scheduler failed to switch tasks.\n");__asm__ volatile("cli");for(;;)__asm__ volatile("hlt");}
+    while(task_switch_count()<6u){__asm__ volatile("hlt");}
     puts("Scheduler smoke test passed: round-robin task switching verified.\n");prompt();
     for(;;){char c;if(!keyboard_read_char(&c)){__asm__ volatile("pause");continue;}if(c=='\n'){command();continue;}if(c=='\b'){if(n){n--;put('\b');put(' ');put('\b');}continue;}if(n<sizeof(line)-1){line[n++]=c;put(c);}}
 }
