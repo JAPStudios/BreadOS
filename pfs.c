@@ -24,7 +24,7 @@ struct pfs_entry {
     char name[FS_NAME_MAX + 1u];
     uint16_t size;
     uint8_t used;
-    uint8_t reserved;
+    uint8_t reserved; /* 0=file, 1=directory; layout remains BreadFS v1. */
 } __attribute__((packed));
 typedef char pfs_directory_must_fit_one_sector[
     (sizeof(struct pfs_entry) * FS_MAX_FILES <= PFS_SECTOR_SIZE) ? 1 : -1];
@@ -34,6 +34,7 @@ static int ready;
 
 static size_t string_length(const char *s) {
     size_t n = 0;
+    if (!s) return 0;
     while (s[n]) ++n;
     return n;
 }
@@ -51,23 +52,56 @@ static void zero_bytes(void *destination, size_t count) {
     uint8_t *d = (uint8_t *)destination;
     for (size_t i = 0; i < count; ++i) d[i] = 0;
 }
-static int valid_name(const char *name) {
-    if (!name) return 0;
-    size_t n = string_length(name);
-    if (n == 0 || n > FS_NAME_MAX) return 0;
+static int valid_path(const char *path) {
+    if (!path) return 0;
+    size_t n = string_length(path);
+    if (!n || n > FS_NAME_MAX || path[0] == '/' || path[n - 1u] == '/') return 0;
+    size_t component = 0;
     for (size_t i = 0; i < n; ++i) {
-        char c = name[i];
-        if (!((c >= 'a' && c <= 'z') ||
-              (c >= 'A' && c <= 'Z') ||
-              (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.'))
-            return 0;
+        char c = path[i];
+        if (c == '/') {
+            if (!component) return 0;
+            component = 0;
+        } else {
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                  (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.'))
+                return 0;
+            ++component;
+        }
     }
-    return 1;
+    return component != 0;
 }
 static int find(const char *name) {
     if (!name) return -1;
     for (size_t i = 0; i < FS_MAX_FILES; ++i)
         if (directory[i].used && same(directory[i].name, name)) return (int)i;
+    return -1;
+}
+static int find_dir(const char *path) {
+    char name[FS_NAME_MAX + 1u];
+    size_t n = string_length(path);
+    if (!valid_path(path) || n >= FS_NAME_MAX) return -1;
+    for (size_t i = 0; i < n; ++i) name[i] = path[i];
+    name[n] = '/';
+    name[n + 1u] = 0;
+    int i = find(name);
+    return i >= 0 && directory[i].reserved == 1u ? i : -1;
+}
+static int parent_exists(const char *path) {
+    size_t n = string_length(path);
+    for (size_t i = 0; i < n; ++i) {
+        if (path[i] == '/') {
+            char parent[FS_NAME_MAX + 1u];
+            for (size_t j = 0; j < i; ++j) parent[j] = path[j];
+            parent[i] = 0;
+            if (find_dir(parent) < 0) return 0;
+        }
+    }
+    return 1;
+}
+static int free_slot(void) {
+    for (size_t i = 0; i < FS_MAX_FILES; ++i)
+        if (!directory[i].used) return (int)i;
     return -1;
 }
 static int write_directory(void) {
@@ -77,21 +111,25 @@ static int write_directory(void) {
     return ata_write_sector(PFS_DIRECTORY_LBA, sector);
 }
 static int valid_entry(const struct pfs_entry *entry) {
-    if (entry->used > 1u) return 0;
+    if (entry->used > 1u || entry->reserved > 1u) return 0;
     if (!entry->used) return 1;
 
-    /* Disk data is untrusted: require a terminator inside the fixed name field
-       before any string helper is allowed to read it. */
+    /* Validate termination before passing untrusted disk strings to helpers. */
     int terminated = 0;
     for (size_t i = 0; i < sizeof(entry->name); ++i) {
-        if (entry->name[i] == '\0') {
-            terminated = 1;
-            break;
-        }
+        if (entry->name[i] == '\0') { terminated = 1; break; }
     }
-    if (!terminated || entry->size > FS_DATA_MAX ||
-        !valid_name(entry->name)) return 0;
-    return 1;
+    if (!terminated || entry->size > FS_DATA_MAX) return 0;
+    size_t n = string_length(entry->name);
+    if (entry->reserved == 1u) {
+        if (n < 2u || n > FS_NAME_MAX || entry->name[n - 1u] != '/' ||
+            entry->size != 0) return 0;
+        char path[FS_NAME_MAX + 1u];
+        for (size_t i = 0; i < n - 1u; ++i) path[i] = entry->name[i];
+        path[n - 1u] = 0;
+        return valid_path(path);
+    }
+    return valid_path(entry->name);
 }
 int pfs_init(void) {
     ready = 0;
@@ -117,7 +155,7 @@ int pfs_init(void) {
         ready = 1;
         if (pfs_write("welcome.txt",
             "BreadOS persistent filesystem is working.\n"
-            "Files on this ATA disk survive reboot.\n") < 0) {
+            "Files survive reboot; use mkdir, mv, and rmdir.\n") < 0) {
             ready = 0;
             return 0;
         }
@@ -154,10 +192,10 @@ const char *pfs_name(size_t index) {
     }
     return (const char *)0;
 }
-int pfs_read(const char *name, char *out, size_t capacity) {
-    if (!ready || !name || !out || capacity == 0) return -1;
-    int slot = find(name);
-    if (slot < 0) return -1;
+int pfs_read(const char *path, char *out, size_t capacity) {
+    if (!ready || !valid_path(path) || !out || capacity == 0) return -1;
+    int slot = find(path);
+    if (slot < 0 || directory[slot].reserved != 0u) return -1;
     uint8_t sector[PFS_SECTOR_SIZE];
     if (ata_read_sector(PFS_DATA_LBA + (uint32_t)slot, sector) != 0) return -1;
     size_t n = directory[slot].size;
@@ -166,42 +204,97 @@ int pfs_read(const char *name, char *out, size_t capacity) {
     out[n] = 0;
     return (int)n;
 }
-int pfs_write(const char *name, const char *data) {
-    if (!ready || !name || !data || !valid_name(name)) return -1;
+int pfs_write(const char *path, const char *data) {
+    if (!ready || !path || !data || !valid_path(path) || !parent_exists(path)) return -1;
     size_t n = string_length(data);
     if (n > FS_DATA_MAX) return -2;
-    int slot = find(name);
-    if (slot < 0) {
-        for (size_t i = 0; i < FS_MAX_FILES; ++i)
-            if (!directory[i].used) { slot = (int)i; break; }
-    }
+    int slot = find(path);
+    if (slot >= 0 && directory[slot].reserved != 0u) return -1;
+    if (slot < 0) slot = free_slot();
     if (slot < 0) return -3;
     uint8_t sector[PFS_SECTOR_SIZE];
     zero_bytes(sector, sizeof(sector));
     copy_bytes(sector, data, n);
     if (ata_write_sector(PFS_DATA_LBA + (uint32_t)slot, sector) != 0) return -4;
     struct pfs_entry previous = directory[slot];
-    if (previous.used == 0) zero_bytes(&directory[slot], sizeof(directory[slot]));
-    size_t name_len = string_length(name);
-    copy_bytes(directory[slot].name, name, name_len);
+    if (!previous.used) zero_bytes(&directory[slot], sizeof(directory[slot]));
+    size_t name_len = string_length(path);
+    copy_bytes(directory[slot].name, path, name_len);
     directory[slot].name[name_len] = 0;
     directory[slot].size = (uint16_t)n;
     directory[slot].used = 1;
+    directory[slot].reserved = 0;
     if (write_directory() != 0) {
         directory[slot] = previous;
         return -4;
     }
     return (int)n;
 }
-int pfs_remove(const char *name) {
-    if (!ready || !name) return -1;
-    int slot = find(name);
-    if (slot < 0) return -1;
+int pfs_remove(const char *path) {
+    if (!ready || !valid_path(path)) return -1;
+    int slot = find(path);
+    if (slot < 0 || directory[slot].reserved != 0u) return -1;
     struct pfs_entry previous = directory[slot];
     zero_bytes(&directory[slot], sizeof(directory[slot]));
     if (write_directory() != 0) {
         directory[slot] = previous;
         return -1;
+    }
+    return 0;
+}
+int pfs_mkdir(const char *path) {
+    size_t n = string_length(path);
+    if (!ready || !valid_path(path) || n >= FS_NAME_MAX || !parent_exists(path)) return -1;
+    if (find(path) >= 0 || find_dir(path) >= 0) return -1;
+    int slot = free_slot();
+    if (slot < 0) return -2;
+    struct pfs_entry previous = directory[slot];
+    zero_bytes(&directory[slot], sizeof(directory[slot]));
+    copy_bytes(directory[slot].name, path, n);
+    directory[slot].name[n] = '/';
+    directory[slot].name[n + 1u] = 0;
+    directory[slot].used = 1;
+    directory[slot].reserved = 1;
+    if (write_directory() != 0) {
+        directory[slot] = previous;
+        return -3;
+    }
+    return 0;
+}
+int pfs_rmdir(const char *path) {
+    if (!ready) return -1;
+    int slot = find_dir(path);
+    if (slot < 0) return -1;
+    size_t n = string_length(directory[slot].name);
+    for (size_t j = 0; j < FS_MAX_FILES; ++j) {
+        if (directory[j].used && (int)j != slot) {
+            size_t k = 0;
+            while (k < n && directory[j].name[k] == directory[slot].name[k]) ++k;
+            if (k == n) return -2;
+        }
+    }
+    struct pfs_entry previous = directory[slot];
+    zero_bytes(&directory[slot], sizeof(directory[slot]));
+    if (write_directory() != 0) {
+        directory[slot] = previous;
+        return -3;
+    }
+    return 0;
+}
+int pfs_move(const char *source, const char *destination) {
+    if (!ready || !valid_path(source) || !valid_path(destination) ||
+        !parent_exists(destination)) return -1;
+    int src = find(source);
+    if (src < 0 || directory[src].reserved != 0u ||
+        find(destination) >= 0 || find_dir(destination) >= 0) return -1;
+    struct pfs_entry previous = directory[src];
+    size_t n = string_length(destination);
+    zero_bytes(directory[src].name, sizeof(directory[src].name));
+    copy_bytes(directory[src].name, destination, n);
+    directory[src].size = previous.size;
+    if (write_directory() != 0) {
+        directory[src] = previous;
+        return -2;
     }
     return 0;
 }
