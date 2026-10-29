@@ -45,12 +45,15 @@ $(BUILD)/breados.iso: $(BUILD)/kernel.elf grub.cfg
 	grub-mkrescue -o $@ $(BUILD)/iso
 $(BUILD)/filesystem-host-test: tests/filesystem-host.c fs.c pfs.c fs.h pfs.h ata.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/filesystem-host.c fs.c pfs.c -o $@
+$(BUILD)/keyboard-host-test: tests/keyboard-host.c kernel/keyboard.c kernel/keyboard.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/keyboard-host.c kernel/keyboard.c -o $@
 iso: $(BUILD)/breados.iso
 run: iso
 	test -f $(BUILD)/breados-disk.img || truncate -s 16M $(BUILD)/breados-disk.img
 	qemu-system-i386 -drive file=$(BUILD)/breados-disk.img,format=raw,if=ide,index=0 -cdrom $(BUILD)/breados.iso -serial stdio
-test: iso $(BUILD)/filesystem-host-test
+test: iso $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test
 	$(BUILD)/filesystem-host-test
+	$(BUILD)/keyboard-host-test
 	bash tests/boot-smoke.sh
 clean:
 	rm -rf $(BUILD)
