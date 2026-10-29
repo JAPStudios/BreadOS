@@ -1,0 +1,7 @@
+services:
+  breados-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: breados-dev:local
+    command: ["make", "clean", "test"]
