@@ -106,6 +106,7 @@ int fs_write(const char *path, const char *data) {
     if (n > FS_DATA_MAX) return -2;
     int i = find(path);
     if (i >= 0 && entries[i].is_dir) return -1;
+    if (find_dir(path) >= 0) return -1;
     if (i < 0) {
         i = free_slot();
         if (i < 0) return -3;
