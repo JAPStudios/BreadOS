@@ -8,7 +8,6 @@
 #include "pfs.h"
 #include "gdt.h"
 #include "task.h"
-#include "syscall.h"
 #include "kernel/keyboard.h"
 #define W 80
 #define H 25
@@ -79,7 +78,6 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     paging_init();puts("Paging enabled: first 16 MiB identity-mapped.\n");
     int storage=pfs_init();if(storage==2)puts("Persistent BreadFS formatted and mounted.\n");else if(storage==1)puts("Persistent BreadFS mounted.\n");else{fs_init();if(storage==0)puts("RAM filesystem initialized (no usable ATA volume).\n");else puts("RAM filesystem initialized (ATA volume not recognized; disk left unchanged).\n");}
      tasking_init();puts("Round-robin kernel task scheduler initialized (3 kernel threads).\n");
-    syscall_init();puts("System call ABI initialized (int 0x80; ring-3 gate).\n");
     puts("Type help for commands.\n");interrupts_init();prompt();
     for(;;){char c;if(!keyboard_read_char(&c)){__asm__ volatile("pause");continue;}if(c=='\n'){command();continue;}if(c=='\b'){if(n){n--;put('\b');put(' ');put('\b');}continue;}if(n<sizeof(line)-1){line[n++]=c;put(c);}}
 }
