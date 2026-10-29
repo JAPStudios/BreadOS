@@ -1,5 +1,6 @@
 #include "interrupts.h"
 #include "task.h"
+#include "syscall.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -36,7 +37,7 @@ extern void isr16(void); extern void isr17(void); extern void isr18(void); exter
 extern void isr20(void); extern void isr21(void); extern void isr22(void); extern void isr23(void);
 extern void isr24(void); extern void isr25(void); extern void isr26(void); extern void isr27(void);
 extern void isr28(void); extern void isr29(void); extern void isr30(void); extern void isr31(void);
-extern void irq0(void);
+extern void irq0(void); extern void isr128(void);
 
 static inline void outb(uint16_t port, uint8_t value) {
     __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
@@ -70,6 +71,9 @@ void interrupts_init(void) {
     }
     for (unsigned i=0;i<32;i++) set_gate(i, exceptions[i]);
     set_gate(32, irq0);
+    set_gate(128, isr128);
+    /* 32-bit interrupt gate, present, callable from ring 3 (DPL=3). */
+    idt[128].attributes = 0xEE;
     struct idt_pointer p = { (uint16_t)(sizeof(idt)-1), (uint32_t)(uintptr_t)idt };
     pic_remap();
     lidt(&p);
@@ -111,6 +115,10 @@ static void fatal_exception(uint32_t vector, uint32_t error_code) {
 }
 uint32_t *interrupt_handler(uint32_t vector, uint32_t error_code, uint32_t *frame) {
     if (vector < 32) fatal_exception(vector, error_code);
+    if (vector == 128) {
+        syscall_dispatch((struct syscall_frame *)frame);
+        return frame;
+    }
     if (vector == 32) {
         ticks++;
         outb(PIC1_COMMAND, 0x20);
