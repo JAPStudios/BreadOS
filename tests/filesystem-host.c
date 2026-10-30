@@ -72,7 +72,11 @@ static void test_ram_directories_and_moves(void) {
     assert(strcmp(output, "inside") == 0);
     assert(fs_rmdir("docs") == 0);
     assert(fs_mkdir("bad/name/child") == -1); /* Parent must exist. */
+    assert(fs_mkdir(".") == -1);
+    assert(fs_mkdir("..") == -1);
+    assert(fs_mkdir("docs/..") == -1);
     assert(fs_write("../escape", "no") == -1);
+    assert(fs_write("docs/../escape", "no") == -1);
 }
 
 static void test_persistent_directories_and_moves(void) {
