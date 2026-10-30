@@ -62,6 +62,8 @@ static void test_ram_directories_and_moves(void) {
     char output[32];
     fs_init();
     assert(fs_mkdir("docs") == 0);
+    assert(fs_mkdir("docs/..") == -1);
+    assert(fs_write("docs/../escape", "no") == -1);
     assert(fs_write("docs", "must not shadow a directory") == -1);
     assert(fs_write("docs/note.txt", "inside") == 6);
     assert(fs_read("docs/note.txt", output, sizeof(output)) == 6);
@@ -85,6 +87,8 @@ static void test_persistent_directories_and_moves(void) {
     memset(disk[1], 0, SECTOR_SIZE);
     assert(pfs_init() == 1);
     assert(pfs_mkdir("docs") == 0);
+    assert(pfs_mkdir("docs/..") == -1);
+    assert(pfs_write("docs/../escape", "no") == -1);
     assert(pfs_write("docs", "must not shadow a directory") == -1);
     assert(pfs_write("docs/note.txt", "inside") == 6);
     assert(pfs_read("docs/note.txt", output, sizeof(output)) == 6);
