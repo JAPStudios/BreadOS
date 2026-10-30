@@ -1,0 +1,5 @@
+# Build products and emulator state
+/build/
+*.o
+*.elf
+*.iso

@@ -6,7 +6,7 @@ BreadOS is an experimental, freestanding 32-bit x86 operating-system kernel. It 
 
 - Multiboot v1 boot through GRUB, with a VGA text console and a polling PS/2 keyboard shell.
 - US keyboard input with Shift and Caps Lock; extended navigation keys are not implemented.
-- GDT setup, a TSS, IDT exception stubs, a remapped PIC, and a 100 Hz PIT tick counter.
+- GDT setup, a TSS, IDT exception stubs, a remapped PIC, a 100 Hz PIT tick counter, and a three-thread round-robin kernel-thread scheduler.
 - A physical frame bitmap initialized from the Multiboot memory map. Allocation is intentionally restricted to the first 16 MiB because that is the only region currently identity-mapped.
 - A fixed 256 KiB kernel heap.
 - Bootstrap paging with a writable, supervisor-only identity map of the first 16 MiB. This is not process isolation or a complete virtual-memory subsystem.
@@ -42,7 +42,7 @@ BreadFS initializes a disk only when its first sector is blank. If the first sec
 
 ## Known limitations
 
-BreadOS does not yet provide user-mode processes, system calls, scheduling, privilege-isolated address spaces, a complete virtual-memory manager, a general-purpose on-disk filesystem, USB support, networking, Wi-Fi, audio, a graphical desktop, application compatibility, secure updates, or Android/ARM64 hardware support. The TSS and user-mode GDT entries are setup groundwork only; user-mode execution is not implemented.
+BreadOS does not yet provide user-mode processes, system calls, preemptive user-process scheduling, privilege-isolated address spaces, a complete virtual-memory manager, a general-purpose on-disk filesystem, USB support, networking, Wi-Fi, audio, a graphical desktop, application compatibility, secure updates, or Android/ARM64 hardware support. The TSS and user-mode GDT entries are setup groundwork only; user-mode execution is not implemented.
 
 The paging implementation maps only the first 16 MiB. The physical frame allocator therefore refuses to allocate frames outside that mapped region. The heap is a fixed, single-core arena and is not backed by the physical frame allocator.
 

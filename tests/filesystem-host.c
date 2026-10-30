@@ -62,6 +62,8 @@ static void test_ram_directories_and_moves(void) {
     char output[32];
     fs_init();
     assert(fs_mkdir("docs") == 0);
+    assert(fs_mkdir("docs/..") == -1);
+    assert(fs_write("docs/../escape", "no") == -1);
     assert(fs_write("docs", "must not shadow a directory") == -1);
     assert(fs_write("docs/note.txt", "inside") == 6);
     assert(fs_read("docs/note.txt", output, sizeof(output)) == 6);
@@ -72,7 +74,11 @@ static void test_ram_directories_and_moves(void) {
     assert(strcmp(output, "inside") == 0);
     assert(fs_rmdir("docs") == 0);
     assert(fs_mkdir("bad/name/child") == -1); /* Parent must exist. */
+    assert(fs_mkdir(".") == -1);
+    assert(fs_mkdir("..") == -1);
+    assert(fs_mkdir("docs/..") == -1);
     assert(fs_write("../escape", "no") == -1);
+    assert(fs_write("docs/../escape", "no") == -1);
 }
 
 static void test_persistent_directories_and_moves(void) {
@@ -81,6 +87,8 @@ static void test_persistent_directories_and_moves(void) {
     memset(disk[1], 0, SECTOR_SIZE);
     assert(pfs_init() == 1);
     assert(pfs_mkdir("docs") == 0);
+    assert(pfs_mkdir("docs/..") == -1);
+    assert(pfs_write("docs/../escape", "no") == -1);
     assert(pfs_write("docs", "must not shadow a directory") == -1);
     assert(pfs_write("docs/note.txt", "inside") == 6);
     assert(pfs_read("docs/note.txt", output, sizeof(output)) == 6);
@@ -90,6 +98,11 @@ static void test_persistent_directories_and_moves(void) {
     assert(pfs_read("note.txt", output, sizeof(output)) == 6);
     assert(strcmp(output, "inside") == 0);
     assert(pfs_rmdir("docs") == 0);
+    assert(pfs_mkdir(".") == -1);
+    assert(pfs_mkdir("..") == -1);
+    assert(pfs_mkdir("docs/..") == -1);
+    assert(pfs_write("../escape", "no") == -1);
+    assert(pfs_write("docs/../escape", "no") == -1);
     /* The metadata and contents survive remounting the same mock disk. */
     assert(pfs_init() == 1);
     assert(pfs_read("note.txt", output, sizeof(output)) == 6);

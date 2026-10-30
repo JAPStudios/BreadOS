@@ -26,19 +26,25 @@ static int valid_path(const char *path) {
     size_t n = length(path);
     if (!n || n > FS_NAME_MAX || path[0] == '/' || path[n - 1u] == '/') return 0;
     size_t component = 0;
-    for (size_t i = 0; i < n; ++i) {
-        char c = path[i];
-        if (c == '/') {
-            if (!component) return 0;
+    size_t component_start = 0;
+    for (size_t i = 0; i <= n; ++i) {
+        if (i == n || path[i] == '/') {
+            if (!component ||
+                (component == 1u && path[component_start] == '.') ||
+                (component == 2u && path[component_start] == '.' &&
+                 path[component_start + 1u] == '.'))
+                return 0;
             component = 0;
+            component_start = i + 1u;
         } else {
+            char c = path[i];
             if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
                   (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.'))
                 return 0;
             ++component;
         }
     }
-    return component != 0;
+    return 1;
 }
 static int find(const char *name) {
     if (!name) return -1;
