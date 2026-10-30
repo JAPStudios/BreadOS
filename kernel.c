@@ -42,6 +42,9 @@ static const char *file_name(size_t i){return pfs_ready()?pfs_name(i):fs_name(i)
 static int file_read(const char *name,char *out,size_t capacity){return pfs_ready()?pfs_read(name,out,capacity):fs_read(name,out,capacity);}
 static int file_write(const char *name,const char *data){return pfs_ready()?pfs_write(name,data):fs_write(name,data);}
 static int file_remove(const char *name){return pfs_ready()?pfs_remove(name):fs_remove(name);}
+static int file_mkdir(const char *path){return pfs_ready()?pfs_mkdir(path):fs_mkdir(path);}
+static int file_rmdir(const char *path){return pfs_ready()?pfs_rmdir(path):fs_rmdir(path);}
+static int file_move(const char *source,const char *destination){return pfs_ready()?pfs_move(source,destination):fs_move(source,destination);}
 static void command(void){
     line[n]=0;
     puts("\n");
@@ -51,7 +54,7 @@ static void command(void){
     while(*end && *end!=' ')++end;
     char *rest=end;
     if(*end){*end++=0;while(*end==' ')++end;rest=end;}else rest=end;
-    if(eq(arg,"help"))puts("Commands: help, about, memory, storage, uptime, tasks, ls, cat NAME, write NAME TEXT, rm NAME, clear, reboot, halt\n");
+    if(eq(arg,"help"))puts("Commands: help, about, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
     else if(eq(arg,"about"))puts("BreadOS: freestanding 32-bit x86 kernel; Multiboot v1 boot.\n");
     else if(eq(arg,"memory")){puts("Free 4 KiB frames: 0x");hex32(memory_free_frames());puts("\n");}
     else if(eq(arg,"storage")){if(pfs_ready())puts("Persistent BreadFS on ATA primary-master disk.\n");else puts("Volatile RAM filesystem; no usable BreadFS volume.\n");}
@@ -60,7 +63,10 @@ static void command(void){
     else if(eq(arg,"ls")){for(size_t i=0;i<file_count();++i){const char *name=file_name(i);if(name){puts(name);puts("\n");}}}
     else if(eq(arg,"cat")){char content[FS_DATA_MAX+1u];if(!*rest)puts("Usage: cat NAME\n");else if(file_read(rest,content,sizeof(content))<0)puts("File not found.\n");else {puts(content);if(content[0]){size_t k=0;while(content[k])++k;if(content[k-1]!='\n')puts("\n");}}}
     else if(eq(arg,"write")){char *name=rest;while(*rest && *rest!=' ')++rest;if(*rest){*rest++=0;while(*rest==' ')++rest;if(!*rest)puts("Usage: write NAME TEXT\n");else {int result=file_write(name,rest);if(result>=0){if(pfs_ready())puts("File written to disk.\n");else puts("File written to RAM.\n");}else if(result==-2)puts("Error: file content limit is 255 bytes.\n");else if(result==-3)puts("Error: RAM filesystem is full.\n");else puts("Invalid filename. Use letters, numbers, dot, dash, underscore.\n");}}else puts("Usage: write NAME TEXT\n");}
-    else if(eq(arg,"rm")){if(!*rest)puts("Usage: rm NAME\n");else if(file_remove(rest)==0){if(pfs_ready())puts("File removed from disk.\n");else puts("File removed from RAM.\n");}else puts("File not found.\n");}
+    else if(eq(arg,"mkdir")){if(!*rest)puts("Usage: mkdir PATH\n");else if(file_mkdir(rest)==0)puts("Directory created.\n");else puts("Cannot create directory (invalid path, existing path, missing parent, or full filesystem).\n");}
+    else if(eq(arg,"rmdir")){if(!*rest)puts("Usage: rmdir PATH\n");else {int result=file_rmdir(rest);if(result==0)puts("Directory removed.\n");else if(result==-2)puts("Directory is not empty.\n");else puts("Directory not found or storage error.\n");}}
+    else if(eq(arg,"mv")){char *source=rest;while(*rest && *rest!=' ')++rest;if(*rest){*rest++=0;while(*rest==' ')++rest;if(!*source||!*rest)puts("Usage: mv SOURCE DEST\n");else if(file_move(source,rest)==0)puts("File moved.\n");else puts("Cannot move file (source missing, destination exists, or invalid path).\n");}else puts("Usage: mv SOURCE DEST\n");}
+    else if(eq(arg,"rm")){if(!*rest)puts("Usage: rm PATH\n");else if(file_remove(rest)==0){if(pfs_ready())puts("File removed from disk.\n");else puts("File removed from RAM.\n");}else puts("File not found.\n");}
     else if(eq(arg,"clear"))clear();
     else if(eq(arg,"reboot")){puts("Rebooting...\n");__asm__ volatile("cli");uint8_t s=0x02;while(s&2)s=inb(0x64);outb(0x64,0xFE);for(;;)__asm__ volatile("hlt");}
     else if(eq(arg,"halt")){puts("CPU halted. Reset the VM to continue.\n");__asm__ volatile("cli");for(;;)__asm__ volatile("hlt");}

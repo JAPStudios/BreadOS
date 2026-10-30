@@ -58,6 +58,44 @@ static void test_persistent_filesystem_null_arguments(void) {
     assert(strcmp(output, "hello") == 0);
 }
 
+static void test_ram_directories_and_moves(void) {
+    char output[32];
+    fs_init();
+    assert(fs_mkdir("docs") == 0);
+    assert(fs_write("docs", "must not shadow a directory") == -1);
+    assert(fs_write("docs/note.txt", "inside") == 6);
+    assert(fs_read("docs/note.txt", output, sizeof(output)) == 6);
+    assert(strcmp(output, "inside") == 0);
+    assert(fs_rmdir("docs") == -2); /* Non-empty directories are protected. */
+    assert(fs_move("docs/note.txt", "note.txt") == 0);
+    assert(fs_read("note.txt", output, sizeof(output)) == 6);
+    assert(strcmp(output, "inside") == 0);
+    assert(fs_rmdir("docs") == 0);
+    assert(fs_mkdir("bad/name/child") == -1); /* Parent must exist. */
+    assert(fs_write("../escape", "no") == -1);
+}
+
+static void test_persistent_directories_and_moves(void) {
+    char output[32];
+    make_valid_volume();
+    memset(disk[1], 0, SECTOR_SIZE);
+    assert(pfs_init() == 1);
+    assert(pfs_mkdir("docs") == 0);
+    assert(pfs_write("docs", "must not shadow a directory") == -1);
+    assert(pfs_write("docs/note.txt", "inside") == 6);
+    assert(pfs_read("docs/note.txt", output, sizeof(output)) == 6);
+    assert(strcmp(output, "inside") == 0);
+    assert(pfs_rmdir("docs") == -2);
+    assert(pfs_move("docs/note.txt", "note.txt") == 0);
+    assert(pfs_read("note.txt", output, sizeof(output)) == 6);
+    assert(strcmp(output, "inside") == 0);
+    assert(pfs_rmdir("docs") == 0);
+    /* The metadata and contents survive remounting the same mock disk. */
+    assert(pfs_init() == 1);
+    assert(pfs_read("note.txt", output, sizeof(output)) == 6);
+    assert(strcmp(output, "inside") == 0);
+}
+
 static void test_malformed_disk_name_is_rejected(void) {
     make_valid_volume();
     /* First entry has no NUL inside its fixed-width on-disk name field. */
@@ -72,6 +110,8 @@ static void test_malformed_disk_name_is_rejected(void) {
 int main(void) {
     test_ram_filesystem_null_arguments();
     test_persistent_filesystem_null_arguments();
+    test_ram_directories_and_moves();
+    test_persistent_directories_and_moves();
     test_malformed_disk_name_is_rejected();
     puts("Filesystem host regression tests passed.");
     return 0;
