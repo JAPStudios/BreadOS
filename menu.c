@@ -23,7 +23,12 @@ static const struct shell_menu_entry entries[] = {
     {"Help","help","Show command usage"},
     {"Help","menu [SEARCH]","Search the native BreadOS command palette"},
     {"Help","history","Show recent shell commands"},
-    {"Desktop","desktop","Open the native floating-window desktop"}
+    {"Desktop","desktop","Open the native floating-window desktop"},
+    {"Notifications","notify TEXT","Create a native system notification"},
+    {"Notifications","notifications","Review retained notification history"},
+    {"Notifications","dnd [on|off]","Toggle Do Not Disturb"},
+    {"Notifications","snooze INDEX TICKS","Temporarily hide a retained notification"},
+    {"Notifications","dismiss INDEX","Dismiss a retained notification"}
 };
 
 static char lower_ascii(char value) {

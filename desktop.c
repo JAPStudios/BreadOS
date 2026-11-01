@@ -5,6 +5,7 @@
 #include "task.h"
 #include "kernel/keyboard.h"
 #include "kernel/mouse.h"
+#include "notification.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -14,6 +15,7 @@
 #define APP_FILES 1u
 #define APP_APPEARANCE 2u
 #define APP_SYSTEM 3u
+#define APP_NOTIFICATIONS 4u
 #define LAYOUT_DWINDLE 0u
 #define LAYOUT_SCROLL 1u
 #define LAYOUT_FLOAT 2u
@@ -41,6 +43,7 @@ static const char *app_title(uint8_t app) {
         case APP_FILES:return "Files";
         case APP_APPEARANCE:return "Appearance";
         case APP_SYSTEM:return "System";
+        case APP_NOTIFICATIONS:return "Notifications";
         default:return "Shell";
     }
 }
@@ -161,6 +164,18 @@ static void draw_window(uint32_t index) {
             uint32_t fg=entry==theme_current()?entry->background:theme->foreground;
             text(px,py,entry->name,fg,bg);
         }
+    } else if(w->app==APP_NOTIFICATIONS) {
+        text(tx,ty,"NOTIFICATION HISTORY",theme->accent,theme->background);ty+=24u;
+        size_t count=notification_count();
+        if(!count) text(tx,ty,"No notifications recorded.",theme->foreground,theme->background);
+        for(size_t i=0;i<count && i<5u;i++) {
+            const struct bread_notification *entry=notification_get(i);
+            if(!entry) continue;
+            text(tx,ty,entry->sender,theme->accent,theme->background);
+            text(tx+104u,ty,entry->title,theme->foreground,theme->background);ty+=18u;
+            text(tx,ty,entry->body,theme->foreground,theme->background);ty+=24u;
+        }
+        text(w->x+w->width-190u,w->y+w->height-22u,"Click a row to dismiss",theme->accent,theme->background);
     } else {
         text(tx,ty,"BREADOS DESKTOP SHELL",theme->accent,theme->background);ty+=24u;
         text(tx,ty,"Keyboard shortcuts:",theme->foreground,theme->background);ty+=20u;
@@ -169,7 +184,27 @@ static void draw_window(uint32_t index) {
         text(tx,ty,"[ / ]  Switch workspace",theme->foreground,theme->background);ty+=18u;
         text(tx,ty,"L  Cycle layouts",theme->foreground,theme->background);ty+=18u;
         text(tx,ty,", / .  Scroll layout",theme->foreground,theme->background);ty+=18u;
+        text(tx,ty,"N  Notifications  D  Do Not Disturb",theme->foreground,theme->background);ty+=18u;
         text(tx,ty,"Q  Return to kernel console",theme->foreground,theme->background);
+    }
+}
+
+static void draw_notification_toasts(void) {
+    if(notification_dnd()) return;
+    const struct bread_theme *theme=theme_current();
+    uint32_t shown=0;
+    for(size_t i=0;i<notification_count() && shown<3u;i++) {
+        if(!notification_is_visible(i,timer_ticks())) continue;
+        const struct bread_notification *entry=notification_get(i);
+        if(!entry) continue;
+        uint32_t x=screen_width>270u?screen_width-258u:8u;
+        uint32_t y=34u+shown*66u;
+        video_fill_rect(x,y,250u,58u,theme->accent);
+        video_fill_rect(x+2u,y+2u,246u,54u,theme->background);
+        text(x+8u,y+5u,entry->sender,theme->accent,theme->background);
+        text(x+8u,y+22u,entry->title,theme->foreground,theme->background);
+        text(x+8u,y+39u,entry->body,theme->foreground,theme->background);
+        shown++;
     }
 }
 
@@ -180,6 +215,7 @@ static void render(void) {
     text(12u,6u,"BREADOS",0xFFFFFFu,0x171C25u);
     text(92u,6u,"NATIVE DESKTOP",theme->accent,0x171C25u);
     text(224u,6u,layout_title(),theme->foreground,0x171C25u);
+    if(notification_dnd() && screen_width>480u) text(300u,6u,"DND",0xF0C674u,0x171C25u);
     for(uint32_t i=0;i<DESKTOP_WORKSPACES;i++) {
         uint32_t x=screen_width-116u+i*26u;
         uint32_t bg=i==active_workspace?theme->accent:0x343D49u;
@@ -190,10 +226,11 @@ static void render(void) {
     for(uint32_t i=0;i<DESKTOP_WINDOWS;i++)
         if(i!=focused_window) draw_window(i);
     if(focused_window<DESKTOP_WINDOWS) draw_window(focused_window);
+    draw_notification_toasts();
     video_fill_rect(0,screen_height-42u,screen_width,42u,0x171C25u);
-    const char *labels[4]={"SHELL","FILES","THEMES","SYSTEM"};
-    for(uint32_t i=0;i<4;i++) {
-        uint32_t x=screen_width/2u-112u+i*58u;
+    const char *labels[5]={"SHELL","FILES","THEMES","SYSTEM","ALERTS"};
+    for(uint32_t i=0;i<5;i++) {
+        uint32_t x=screen_width/2u-145u+i*58u;
         video_fill_rect(x,screen_height-36u,52u,30u,i==0?theme->accent:0x343D49u);
         text(x+5u,screen_height-28u,labels[i],0xFFFFFFu,i==0?theme->accent:0x343D49u);
     }
@@ -246,8 +283,8 @@ static void mouse_event(const struct mouse_event *event) {
             uint32_t workspace=(pointer_x-(screen_width-116u))/26u;
             if(workspace<DESKTOP_WORKSPACES) switch_workspace(workspace);
         } else if(pointer_y>=screen_height-42u) {
-            uint32_t slot=(pointer_x+112u-screen_width/2u)/58u;
-            if(pointer_x+112u>=screen_width/2u && slot<4u) open_app((uint8_t)slot);
+            uint32_t slot=(pointer_x+145u-screen_width/2u)/58u;
+            if(pointer_x+145u>=screen_width/2u && slot<5u) open_app((uint8_t)slot);
         } else {
             for(int32_t i=(int32_t)DESKTOP_WINDOWS-1;i>=0;i--) {
                 struct desktop_window *w=&windows[i];
@@ -262,6 +299,9 @@ static void mouse_event(const struct mouse_event *event) {
                     else if(workspace_layout[active_workspace]==LAYOUT_FLOAT) {
                         dragging=i;drag_x=(int32_t)pointer_x-(int32_t)view.x;drag_y=(int32_t)pointer_y-(int32_t)view.y;
                     }
+                } else if(w->app==APP_NOTIFICATIONS && pointer_y>=view.y+58u) {
+                    uint32_t row=(pointer_y-(view.y+58u))/42u;
+                    if(row<notification_count() && row<5u) notification_dismiss(row);
                 } else if(w->app==APP_APPEARANCE && pointer_y>=view.y+58u) {
                     if(pointer_x>=view.x+12u) {
                         uint32_t column=(pointer_x-(view.x+12u))/152u;
@@ -291,7 +331,7 @@ static void mouse_event(const struct mouse_event *event) {
 int desktop_run(void) {
     if(!video_available()) return -1;
     screen_width=video_width();screen_height=video_height();
-    if(screen_width<240u || screen_height<200u) return -1;
+    if(screen_width<320u || screen_height<240u) return -1;
     for(uint32_t i=0;i<DESKTOP_WINDOWS;i++) windows[i].open=0;
     active_workspace=0;focused_window=DESKTOP_WINDOWS;dragging=-1;previous_buttons=0;
     for(uint32_t i=0;i<DESKTOP_WORKSPACES;i++){workspace_layout[i]=LAYOUT_DWINDLE;workspace_scroll[i]=0;}
@@ -310,6 +350,8 @@ int desktop_run(void) {
             else if(key=='f' || key=='F'){open_app(APP_FILES);changed=1;}
             else if(key=='s' || key=='S'){open_app(APP_SYSTEM);changed=1;}
             else if(key=='e' || key=='E'){open_app(APP_SHELL);changed=1;}
+            else if(key=='n' || key=='N'){open_app(APP_NOTIFICATIONS);changed=1;}
+            else if(key=='d' || key=='D'){notification_set_dnd(!notification_dnd());changed=1;}
             else if(key=='[' && active_workspace) {switch_workspace(active_workspace-1u);changed=1;}
             else if(key==']' && active_workspace+1u<DESKTOP_WORKSPACES){switch_workspace(active_workspace+1u);changed=1;}
             else if(key=='l' || key=='L'){workspace_layout[active_workspace]=(uint8_t)((workspace_layout[active_workspace]+1u)%3u);workspace_scroll[active_workspace]=0;dragging=-1;changed=1;}

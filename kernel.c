@@ -16,6 +16,7 @@
 #include "theme.h"
 #include "menu.h"
 #include "desktop.h"
+#include "notification.h"
 #define W 80
 #define H 25
 #define MB_MAGIC 0x2BADB002u
@@ -49,6 +50,19 @@ static void puts(const char*s){while(*s)put(*s++);}
 void console_put_char(char c){put(c);}
 static void clear(void){const struct bread_theme *t=theme_current();uint32_t light=((t->background>>16&255u)+(t->background>>8&255u)+(t->background&255u))/3u;uint16_t attr=light>128u?0x7000u:0x0F00u;for(size_t i=0;i<W*H;i++)vga[i]=(uint16_t)' '|attr;row=col=0;if(video_available())video_console_clear(t->background,t->foreground);}
 static int eq(const char*a,const char*b){while(*a&&*b&&*a==*b){a++;b++;}return *a==*b;}
+static int parse_u32(const char *text,uint32_t *out) {
+    if(!text || !*text || !out) return 0;
+    uint32_t value=0;
+    while(*text) {
+        if(*text<'0' || *text>'9') return 0;
+        uint32_t digit=(uint32_t)(*text-'0');
+        if(value>(0xFFFFFFFFu-digit)/10u) return 0;
+        value=value*10u+digit;
+        text++;
+    }
+    *out=value;
+    return 1;
+}
 static void hex32(uint32_t value){static const char d[]="0123456789ABCDEF";for(int s=28;s>=0;s-=4)put(d[(value>>s)&15u]);}
 static void prompt(void){puts("bread> ");}
 static size_t file_count(void){return pfs_ready()?pfs_count():fs_count();}
@@ -71,11 +85,30 @@ static void command(void){
     while(*end && *end!=' ')++end;
     char *rest=end;
     if(*end){*end++=0;while(*end==' ')++end;rest=end;}else rest=end;
-    if(eq(arg,"help"))puts("Commands: help, menu [SEARCH], history, theme [NAME], desktop, about, video, userdemo, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
+    if(eq(arg,"help"))puts("Commands: help, menu [SEARCH], history, theme [NAME], desktop, notify TEXT, notifications, snooze INDEX TICKS, dismiss INDEX, dnd [on|off], about, video, userdemo, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
     else if(eq(arg,"menu")){size_t shown=0;puts("BreadOS command palette\n");for(size_t i=0;i<shell_menu_count();i++){const struct shell_menu_entry *entry=shell_menu_at(i);if(shell_menu_matches(entry,rest)){puts("[");puts(entry->category);puts("] ");puts(entry->command);puts(" - ");puts(entry->description);puts("\n");shown++;}}if(!shown)puts("No matching commands.\n");}
     else if(eq(arg,"history")){uint32_t start=(history_head+HISTORY_CAPACITY-history_count)%HISTORY_CAPACITY;for(uint32_t i=0;i<history_count;i++){uint32_t slot=(start+i)%HISTORY_CAPACITY;hex32(i+1u);puts("  ");puts(command_history[slot]);puts("\n");}}
     else if(eq(arg,"theme")){if(!*rest){puts("Current theme: ");puts(theme_current()->name);puts("\nAvailable themes: ");for(size_t i=0;i<theme_count();i++){if(i)puts(", ");puts(theme_at(i)->name);}puts("\n");}else if(theme_apply(rest)==0){clear();if(file_write("theme",theme_current()->name)>=0){puts("Theme applied and saved: ");puts(theme_current()->name);puts("\n");}else puts("Theme applied, but could not be saved to storage.\n");}else puts("Unknown theme. Run theme to list available themes.\n");}
-    else if(eq(arg,"desktop")){int result=desktop_run();clear();if(result==0)puts("Returned to BreadOS shell.\n");else puts("Graphical desktop unavailable; an RGB framebuffer of at least 240x200 is required.\n");}
+    else if(eq(arg,"desktop")){int result=desktop_run();clear();if(result==0)puts("Returned to BreadOS shell.\n");else puts("Graphical desktop unavailable; an RGB framebuffer of at least 320x240 is required.\n");}
+    else if(eq(arg,"notify")){if(!*rest)puts("Usage: notify TEXT\n");else if(notification_push("BreadOS","Notice",rest,timer_ticks()))puts("Notification stored; Do Not Disturb is suppressing alerts.\n");else puts("Notification queued.\n");}
+    else if(eq(arg,"notifications")){size_t count=notification_count();if(!count)puts("No notifications.\n");for(size_t i=0;i<count;i++){const struct bread_notification *entry=notification_get(i);if(entry){puts(entry->sender);puts(": ");puts(entry->title);puts(" - ");puts(entry->body);if(entry->dismissed)puts(" [dismissed]");else if(entry->snoozed_until && (int32_t)(timer_ticks()-entry->snoozed_until)<0)puts(" [snoozed]");puts("\n");}}}
+    else if(eq(arg,"snooze")) {
+        char *p=rest;while(*p==' ')p++;
+        char *q=p;while(*q>='0' && *q<='9')q++;
+        if(*q){*q++=0;while(*q==' ')q++;}
+        uint32_t index=0,duration=0;
+        if(!*p || !*q || !parse_u32(p,&index) || !parse_u32(q,&duration) ||
+           notification_snooze(index,timer_ticks(),duration)<0)
+            puts("Usage: snooze INDEX TICKS (100 ticks = 1 second).\n");
+        else puts("Notification snoozed.\n");
+    }
+    else if(eq(arg,"dismiss")) {
+        uint32_t index=0;
+        if(!parse_u32(rest,&index) || notification_dismiss(index)<0)
+            puts("Usage: dismiss INDEX.\n");
+        else puts("Notification dismissed.\n");
+    }
+    else if(eq(arg,"dnd")){if(!*rest)notification_set_dnd(!notification_dnd());else if(eq(rest,"on"))notification_set_dnd(1);else if(eq(rest,"off"))notification_set_dnd(0);else puts("Usage: dnd [on|off]\n");if(!*rest||eq(rest,"on")||eq(rest,"off"))puts(notification_dnd()?"Do Not Disturb enabled.\n":"Do Not Disturb disabled.\n");}
     else if(eq(arg,"about"))puts("BreadOS: freestanding 32-bit x86 kernel; Multiboot v1 boot.\n");
     else if(eq(arg,"video")){if(video_available()){puts("Framebuffer: ");hex32(video_width());puts(" x ");hex32(video_height());puts(" RGB\n");}else puts("No supported RGB framebuffer; VGA text console remains active.\n");}
     else if(eq(arg,"userdemo")){int result=process_run_user_demo();if(result==0)puts("Ring-3 process exited successfully.\n");else puts("Ring-3 process failed.\n");}
