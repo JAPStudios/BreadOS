@@ -67,7 +67,8 @@ static void system_metrics_update(uint32_t now) {
     uint32_t elapsed=now-metric_last_tick;
     if(elapsed<100u) return;
     uint32_t delta=switches-metric_last_switches;
-    metric_switches_per_second=(uint32_t)(((uint64_t)delta*100u)/elapsed);
+    uint32_t scaled=delta>UINT32_MAX/100u?UINT32_MAX:delta*100u;
+    metric_switches_per_second=scaled/elapsed;
     metric_history[metric_history_head]=metric_switches_per_second;
     metric_history_head=(metric_history_head+1u)%METRIC_HISTORY;
     metric_last_tick=now;
