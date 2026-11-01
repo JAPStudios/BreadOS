@@ -4,7 +4,7 @@ BreadOS is an experimental, freestanding 32-bit x86 operating-system kernel. It 
 
 ## Implemented kernel and system foundations
 
-- Multiboot v1 boot through GRUB, requesting a 1024×768×32 RGB graphics mode with a VGA text fallback.
+- Multiboot v1 boot through GRUB, retaining the VGA text console while accepting an RGB framebuffer when the bootloader supplies one.
 - Validated Multiboot RGB framebuffer discovery and mapping into a dedicated virtual window, with clipped pixel and rectangle drawing primitives.
 - GDT setup, TSS, IDT exception stubs, remapped PIC, and a 100 Hz PIT tick counter.
 - Physical frame bitmap initialized from the Multiboot memory map; allocation remains restricted to the first 16 MiB identity-mapped region.
