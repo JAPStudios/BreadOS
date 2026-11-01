@@ -22,7 +22,8 @@ static const struct shell_menu_entry entries[] = {
     {"Appearance","clear","Clear the console"},
     {"Help","help","Show command usage"},
     {"Help","menu [SEARCH]","Search the native BreadOS command palette"},
-    {"Help","history","Show recent shell commands"}
+    {"Help","history","Show recent shell commands"},
+    {"Desktop","desktop","Open the native floating-window desktop"}
 };
 
 static char lower_ascii(char value) {

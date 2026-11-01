@@ -34,6 +34,9 @@ int main(void) {
     p = pixels + 1 * 64 + 2 * 4;
     assert(p[0] == 0xFF && p[1] == 0xFF && p[2] == 0xFF);
     video_console_put('\n');
+    video_draw_text(0,0,"A",0xFFFFFFu,0x000000u);
+    p = pixels + 1 * 64 + 2 * 4;
+    assert(p[0] == 0xFF && p[1] == 0xFF && p[2] == 0xFF);
     video_clear(0x0000FFu);
     assert(pixels[0] == 0xFF && pixels[1] == 0 && pixels[2] == 0);
     return 0;

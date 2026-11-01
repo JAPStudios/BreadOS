@@ -176,6 +176,31 @@ static void glyph_rows(char ch, uint8_t rows[7]) {
     for (uint32_t i=0;i<7;i++) rows[i]=0;
 }
 
+void video_draw_text(uint32_t x,uint32_t y,const char *text,
+                     uint32_t foreground,uint32_t background) {
+    if (!active || !text) return;
+    uint32_t origin_x=x;
+    uint8_t rows[7];
+    while (*text) {
+        if (*text=='\\n') {
+            x=origin_x;
+            y+=CELL_HEIGHT;
+            text++;
+            continue;
+        }
+        if (x>=active_mode.width || y>=active_mode.height) break;
+        video_fill_rect(x,y,CELL_WIDTH,CELL_HEIGHT,background);
+        glyph_rows(*text++,rows);
+        for (uint32_t gy=0;gy<7;gy++)
+            for (uint32_t gx=0;gx<5;gx++)
+                if (rows[gy]&(1u<<(4u-gx))) {
+                    video_pixel(x+1u+gx,y+1u+gy*2u,foreground);
+                    video_pixel(x+1u+gx,y+2u+gy*2u,foreground);
+                }
+        x+=CELL_WIDTH;
+    }
+}
+
 static void console_scroll(void) {
     uint32_t bytes_per_pixel = active_mode.bits_per_pixel / 8u;
     uint32_t scroll_bytes = (active_mode.height > CELL_HEIGHT)

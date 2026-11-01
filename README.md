@@ -12,10 +12,10 @@ BreadOS is an experimental, freestanding 32-bit x86 operating-system kernel. It 
 - PS/2 keyboard IRQ1 character queue with polling fallback, plus PS/2 mouse IRQ12 packet decoding and bounded pointer-event queue; serial diagnostics.
 - Small RAM filesystem and fixed-sector ATA PIO-backed BreadFS v1. Both remain limited to 16 total entries, 15-character paths, and 255 bytes per file.
 - Round-robin kernel-thread scheduler with a preemptible ring-3 demonstration process, two user-mapped pages, and an `int 0x80` character-write/exit syscall path.
-- Native command palette with category and text search, 16-entry shell history, and 23 selectable Omarchy-derived color themes. Theme selection persists across boots on BreadFS.
+- Native framebuffer desktop with draggable floating windows, four workspaces, a dock, mouse interaction, and built-in Shell, Files, Appearance, and System windows. The Appearance window selects themes; Files lists BreadFS entries; System displays live kernel counters.\n- Native command palette with category and text search, 16-entry shell history, and 23 selectable Omarchy-derived color themes. Theme selection persists across boots on BreadFS.
 - Host regression tests for filesystems, keyboard translation and input-queue behavior, mouse packet decoding, task switching, framebuffer drawing/text, theme selection, and command-palette search; QEMU boot/persistence smoke test.
 
-The shell provides `help`, `menu [SEARCH]`, `history`, `theme [NAME]`, `about`, `video`, `userdemo`, `memory`, `storage`, `uptime`, `tasks`, `ls`, `mkdir PATH`, `rmdir PATH`, `cat PATH`, `write PATH TEXT`, `mv SOURCE DEST`, `rm PATH`, `clear`, `reboot`, and `halt`. `menu` searches a native command registry; `theme` lists or applies the 23 palettes and saves the selected theme in BreadFS.
+The shell provides `help`, `menu [SEARCH]`, `history`, `theme [NAME]`, `about`, `video`, `userdemo`, `memory`, `storage`, `uptime`, `tasks`, `ls`, `mkdir PATH`, `rmdir PATH`, `cat PATH`, `write PATH TEXT`, `mv SOURCE DEST`, `rm PATH`, `clear`, `reboot`, and `halt`. `menu` searches a native command registry; `theme` lists or applies the 23 palettes and saves the selected theme in BreadFS; `desktop` opens the framebuffer desktop (press `q` to return, use `t`, `f`, `s`, `e`, `1`–`4`, and `[`/`]` for navigation).
 
 ## Build
 
@@ -36,7 +36,7 @@ make run
 
 ## Native desktop feature port
 
-BreadOS reimplements Omarchy's user-facing features against its own kernel and userspace. The first native ports are the searchable command palette, shell history, and persistent theme selection using all 23 upstream theme color palettes. The framebuffer console, keyboard, mouse, and ring-3 syscall foundation are also native BreadOS code. Linux, Arch, systemd, pacman, Wayland, Hyprland, Quickshell, D-Bus, and Linux userspace ABI components are not runtime dependencies. This remains an incremental implementation: the window manager, compositor, panels, notifications, application framework, installer, package/update system, networking, audio, and broad hardware support are still outstanding.
+BreadOS reimplements Omarchy's user-facing features against its own kernel and userspace. The first native ports are the searchable command palette, shell history, and persistent theme selection using all 23 upstream theme color palettes. The framebuffer console, keyboard, mouse, and ring-3 syscall foundation are also native BreadOS code. Linux, Arch, systemd, pacman, Wayland, Hyprland, Quickshell, D-Bus, and Linux userspace ABI components are not runtime dependencies. This remains an incremental implementation: the full compositor and process-backed application framework, per-monitor workspaces, tiling and scrolling layouts, notifications, clipboard manager, full settings panels, installer, package/update system, networking, audio, and broad hardware support are still outstanding.
 
 ## Known limitations
 
