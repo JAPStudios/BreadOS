@@ -14,7 +14,8 @@ BreadOS is a freestanding 32-bit x86 operating system with its own kernel and na
 - Twenty-three native color palettes ported from Omarchy theme data. Theme selection persists in BreadFS across reboots.
 - Searchable command palette, 16-entry shell history, and a native notification service with a 16-entry history, stacked alerts, dismissal, snoozing, and Do Not Disturb.
 - Native clipboard history with sensitive-content exclusion, plus timer-based reminders delivered through the notification service.
-- Host regression tests for filesystems, keyboard input, mouse packets, task switching, framebuffer rendering, themes, command search, notifications, clipboard history, and reminders, plus QEMU boot and persistence tests.
+- Configurable desktop idle screensaver with a persistent timeout; keyboard or mouse activity wakes it. This is not an authenticated screen lock.
+- Host regression tests for filesystems, keyboard input, mouse packets, task switching, framebuffer rendering, themes, command search, notifications, clipboard history, reminders, and idle timeout behavior, plus QEMU boot and persistence tests.
 
 ## Shell commands
 
@@ -36,7 +37,7 @@ make run
 
 ## Remaining Omarchy feature work
 
-The current desktop is kernel-rendered; its windows are not yet independent user-mode applications. The ring-3 path is a fixed smoke-test program, not a general process system. Independent address spaces, a general executable loader, IPC, process lifecycle management, a full VFS, per-monitor workspaces, multi-display management, advanced window effects, clipboard history, full settings panels, language/localization coverage, authenticated screen locking, screenshot/recording, audio, networking, Bluetooth, USB, broad hardware support, an installer, secure package management, transactional updates, snapshots, and the remaining Omarchy application/workflow features still require native implementation.
+The current desktop is kernel-rendered; its windows are not yet independent user-mode applications. The ring-3 path is a fixed smoke-test program, not a general process system. Independent address spaces, a general executable loader, IPC, process lifecycle management, a full VFS, per-monitor workspaces, multi-display management, advanced window effects, cross-application clipboard integration, full settings panels, language/localization coverage, authenticated screen locking, screenshot/recording, audio, networking, Bluetooth, USB, broad hardware support, an installer, secure package management, transactional updates, snapshots, and the remaining Omarchy application/workflow features still require native implementation.
 
 ## Storage safety
 
