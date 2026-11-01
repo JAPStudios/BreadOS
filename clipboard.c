@@ -1,4 +1,5 @@
 #include "clipboard.h"
+#include "secure_memory.h"
 
 static char current[BREADOS_CLIPBOARD_TEXT_MAX+1u];
 static char history[BREADOS_CLIPBOARD_HISTORY][BREADOS_CLIPBOARD_TEXT_MAX+1u];
@@ -43,6 +44,7 @@ int clipboard_restore(size_t index) {
 }
 
 void clipboard_clear(void) {
-    current[0]=0;next_slot=0;used_count=0;
-    for(size_t i=0;i<BREADOS_CLIPBOARD_HISTORY;i++)history[i][0]=0;
+    secure_memzero(current,sizeof(current));
+    secure_memzero(history,sizeof(history));
+    next_slot=0;used_count=0;
 }

@@ -41,13 +41,17 @@ $(BUILD)/menu.o: menu.c menu.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/notification.o: notification.c notification.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
-$(BUILD)/clipboard.o: clipboard.c clipboard.h | $(BUILD)
+$(BUILD)/clipboard.o: clipboard.c clipboard.h secure_memory.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/reminder.o: reminder.c reminder.h notification.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/idle.o: idle.c idle.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/launcher.o: launcher.c launcher.h | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+$(BUILD)/privacy.o: privacy.c privacy.h | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+$(BUILD)/secure_memory.o: secure_memory.c secure_memory.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/desktop.o: desktop.c desktop.h video.h theme.h memory.h task.h kernel/keyboard.h kernel/mouse.h notification.h clipboard.h reminder.h idle.h launcher.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -57,13 +61,13 @@ $(BUILD)/keyboard.o: kernel/keyboard.c kernel/keyboard.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/mouse.o: kernel/mouse.c kernel/mouse.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
-$(BUILD)/kernel.o: kernel.c memory.h heap.h interrupts.h fs.h pfs.h paging.h video.h gdt.h task.h kernel/keyboard.h kernel/mouse.h process.h console.h theme.h menu.h desktop.h notification.h clipboard.h reminder.h | $(BUILD)
+$(BUILD)/kernel.o: kernel.c memory.h privacy.h heap.h interrupts.h fs.h pfs.h paging.h video.h gdt.h task.h kernel/keyboard.h kernel/mouse.h process.h console.h theme.h menu.h desktop.h notification.h clipboard.h reminder.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/interrupts.o: interrupts.s | $(BUILD)
 	$(AS) --32 $< -o $@
 $(BUILD)/interrupts_c.o: interrupts.c interrupts.h task.h video.h kernel/keyboard.h kernel/mouse.h syscall.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
-$(BUILD)/kernel.elf: $(BUILD)/boot.o $(BUILD)/gdt.o $(BUILD)/gdt_load.o $(BUILD)/usermode.o $(BUILD)/process.o $(BUILD)/syscall.o $(BUILD)/kernel.o $(BUILD)/keyboard.o $(BUILD)/mouse.o $(BUILD)/memory.o $(BUILD)/heap.o $(BUILD)/fs.o $(BUILD)/ata.o $(BUILD)/pfs.o $(BUILD)/paging.o $(BUILD)/video.o $(BUILD)/theme.o $(BUILD)/menu.o $(BUILD)/desktop.o $(BUILD)/notification.o $(BUILD)/clipboard.o $(BUILD)/reminder.o $(BUILD)/idle.o $(BUILD)/launcher.o $(BUILD)/task.o $(BUILD)/interrupts.o $(BUILD)/interrupts_c.o linker.ld
+$(BUILD)/kernel.elf: $(BUILD)/boot.o $(BUILD)/gdt.o $(BUILD)/gdt_load.o $(BUILD)/usermode.o $(BUILD)/process.o $(BUILD)/syscall.o $(BUILD)/kernel.o $(BUILD)/keyboard.o $(BUILD)/mouse.o $(BUILD)/memory.o $(BUILD)/heap.o $(BUILD)/fs.o $(BUILD)/ata.o $(BUILD)/pfs.o $(BUILD)/paging.o $(BUILD)/video.o $(BUILD)/theme.o $(BUILD)/menu.o $(BUILD)/desktop.o $(BUILD)/notification.o $(BUILD)/clipboard.o $(BUILD)/reminder.o $(BUILD)/idle.o $(BUILD)/launcher.o $(BUILD)/privacy.o $(BUILD)/secure_memory.o $(BUILD)/task.o $(BUILD)/interrupts.o $(BUILD)/interrupts_c.o linker.ld
 	$(LD) $(LDFLAGS) -o $@ $(BUILD)/boot.o $(BUILD)/gdt.o $(BUILD)/gdt_load.o $(BUILD)/usermode.o $(BUILD)/process.o $(BUILD)/syscall.o $(BUILD)/interrupts.o $(BUILD)/interrupts_c.o $(BUILD)/memory.o $(BUILD)/heap.o $(BUILD)/fs.o $(BUILD)/ata.o $(BUILD)/pfs.o $(BUILD)/paging.o $(BUILD)/video.o $(BUILD)/theme.o $(BUILD)/menu.o $(BUILD)/desktop.o $(BUILD)/notification.o $(BUILD)/clipboard.o $(BUILD)/reminder.o $(BUILD)/idle.o $(BUILD)/launcher.o $(BUILD)/task.o $(BUILD)/keyboard.o $(BUILD)/mouse.o $(BUILD)/kernel.o
 	grub-file --is-x86-multiboot $@
 $(BUILD)/breados.iso: $(BUILD)/kernel.elf grub.cfg
@@ -93,6 +97,10 @@ $(BUILD)/idle-host-test: tests/idle-host.c idle.c idle.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/idle-host.c idle.c -o $@
 $(BUILD)/launcher-host-test: tests/launcher-host.c launcher.c launcher.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/launcher-host.c launcher.c -o $@
+$(BUILD)/privacy-host-test: tests/privacy-host.c privacy.c privacy.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/privacy-host.c privacy.c -o $@
+$(BUILD)/secure-memory-host-test: tests/secure-memory-host.c secure_memory.c secure_memory.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/secure-memory-host.c secure_memory.c -o $@
 $(BUILD)/video-host-test: tests/video-host.c video.c video.h paging.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/video-host.c video.c -o $@
 iso: $(BUILD)/breados.iso
@@ -112,6 +120,8 @@ test: iso $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/tas
 	$(BUILD)/reminder-host-test
 	$(BUILD)/idle-host-test
 	$(BUILD)/launcher-host-test
+	$(BUILD)/privacy-host-test
+	$(BUILD)/secure-memory-host-test
 	bash tests/boot-smoke.sh
 clean:
 	rm -rf $(BUILD)
