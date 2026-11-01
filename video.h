@@ -21,5 +21,7 @@ void video_clear(uint32_t rgb);
 void video_pixel(uint32_t x, uint32_t y, uint32_t rgb);
 void video_fill_rect(uint32_t x, uint32_t y, uint32_t width,
                      uint32_t height, uint32_t rgb);
+void video_console_clear(uint32_t background, uint32_t foreground);
+void video_console_put(char character);
 
 #endif

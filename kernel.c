@@ -27,14 +27,17 @@ static void scroll(void){
     row=H-1;
 }
 static void put(char c){
-    if(c=='\n'){col=0;if(++row>=H)scroll();}
-    else if(c=='\r'){col=0;}
-    else if(c=='\b'){if(col)col--;}
-    else {vga[row*W+col]=(uint16_t)c|0x0F00;if(++col>=W){col=0;if(++row>=H)scroll();}}
+    if(video_available()) video_console_put(c);
+    else {
+        if(c=='\n'){col=0;if(++row>=H)scroll();}
+        else if(c=='\r'){col=0;}
+        else if(c=='\b'){if(col)col--;}
+        else {vga[row*W+col]=(uint16_t)c|0x0F00;if(++col>=W){col=0;if(++row>=H)scroll();}}
+    }
     for(unsigned i=0;i<100000;i++)if(inb(COM1+5)&0x20){outb(COM1,c);break;}
 }
 static void puts(const char*s){while(*s)put(*s++);}
-static void clear(void){for(size_t i=0;i<W*H;i++)vga[i]=0x0F20;row=col=0;}
+static void clear(void){for(size_t i=0;i<W*H;i++)vga[i]=0x0F20;row=col=0;if(video_available())video_console_clear(0x101820u,0xE6E6E6u);}
 static int eq(const char*a,const char*b){while(*a&&*b&&*a==*b){a++;b++;}return *a==*b;}
 static void hex32(uint32_t value){static const char d[]="0123456789ABCDEF";for(int s=28;s>=0;s-=4)put(d[(value>>s)&15u]);}
 static void prompt(void){puts("bread> ");}
@@ -84,7 +87,7 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     memory_init(mbi);puts("Physical frame allocator initialized.\n");
     heap_init();puts("Kernel heap initialized (256 KiB).\n");
     paging_init();puts("Paging enabled: first 16 MiB identity-mapped.\n");
-    if(video_init(mbi)==0){video_clear(0x101820u);video_fill_rect(0,0,video_width(),8,0xD69E36u);puts("GRUB RGB framebuffer mapped; native pixel renderer initialized.\n");}else puts("No supported GRUB RGB framebuffer; VGA text fallback active.\n");
+    if(video_init(mbi)==0){video_console_clear(0x101820u,0xE6E6E6u);puts("GRUB RGB framebuffer mapped; native graphical text console initialized.\n");}else puts("No supported GRUB RGB framebuffer; VGA text fallback active.\n");
     int storage=pfs_init();if(storage==2)puts("Persistent BreadFS formatted and mounted.\n");else if(storage==1)puts("Persistent BreadFS mounted.\n");else{fs_init();if(storage==0)puts("RAM filesystem initialized (no usable ATA volume).\n");else puts("RAM filesystem initialized (ATA volume not recognized; disk left unchanged).\n");}
     tasking_init();puts("Round-robin kernel scheduler initialized (3 kernel threads).\n");
     puts("Type help for commands.\n");interrupts_init();
