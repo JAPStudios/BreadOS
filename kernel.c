@@ -5,6 +5,7 @@
 #include "heap.h"
 #include "fs.h"
 #include "paging.h"
+#include "video.h"
 #include "pfs.h"
 #include "gdt.h"
 #include "task.h"
@@ -54,8 +55,9 @@ static void command(void){
     while(*end && *end!=' ')++end;
     char *rest=end;
     if(*end){*end++=0;while(*end==' ')++end;rest=end;}else rest=end;
-    if(eq(arg,"help"))puts("Commands: help, about, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
+    if(eq(arg,"help"))puts("Commands: help, about, video, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
     else if(eq(arg,"about"))puts("BreadOS: freestanding 32-bit x86 kernel; Multiboot v1 boot.\n");
+    else if(eq(arg,"video")){if(video_available()){puts("Framebuffer: ");hex32(video_width());puts(" x ");hex32(video_height());puts(" RGB\n");}else puts("No supported RGB framebuffer; VGA text console remains active.\n");}
     else if(eq(arg,"memory")){puts("Free 4 KiB frames: 0x");hex32(memory_free_frames());puts("\n");}
     else if(eq(arg,"storage")){if(pfs_ready())puts("Persistent BreadFS on ATA primary-master disk.\n");else puts("Volatile RAM filesystem; no usable BreadFS volume.\n");}
     else if(eq(arg,"uptime")){puts("PIT ticks at 100 Hz: ");hex32(timer_ticks());puts("\n");}
@@ -82,6 +84,7 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     memory_init(mbi);puts("Physical frame allocator initialized.\n");
     heap_init();puts("Kernel heap initialized (256 KiB).\n");
     paging_init();puts("Paging enabled: first 16 MiB identity-mapped.\n");
+    if(video_init(mbi)==0){video_clear(0x101820u);video_fill_rect(0,0,video_width(),8,0xD69E36u);puts("GRUB RGB framebuffer mapped; native pixel renderer initialized.\n");}else puts("No supported GRUB RGB framebuffer; VGA text fallback active.\n");
     int storage=pfs_init();if(storage==2)puts("Persistent BreadFS formatted and mounted.\n");else if(storage==1)puts("Persistent BreadFS mounted.\n");else{fs_init();if(storage==0)puts("RAM filesystem initialized (no usable ATA volume).\n");else puts("RAM filesystem initialized (ATA volume not recognized; disk left unchanged).\n");}
     tasking_init();puts("Round-robin kernel scheduler initialized (3 kernel threads).\n");
     puts("Type help for commands.\n");interrupts_init();

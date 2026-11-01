@@ -1,30 +1,31 @@
 # BreadOS
 
-BreadOS is an experimental, freestanding 32-bit x86 operating-system kernel. It is a development prototype, not yet a replacement for Windows, macOS, Linux, or Android.
+BreadOS is an experimental, freestanding 32-bit x86 operating-system kernel. It remains its own kernel and userspace; Omarchy is a feature reference, not a runtime base.
 
-## Current implementation
+## Implemented kernel and system foundations
 
-- Multiboot v1 boot through GRUB, with a VGA text console and a polling PS/2 keyboard shell.
-- US keyboard input with Shift and Caps Lock; extended navigation keys are not implemented.
-- GDT setup, a TSS, IDT exception stubs, a remapped PIC, and a 100 Hz PIT tick counter.
-- A physical frame bitmap initialized from the Multiboot memory map. Allocation is intentionally restricted to the first 16 MiB because that is the only region currently identity-mapped.
-- A fixed 256 KiB kernel heap.
-- Bootstrap paging with a writable, supervisor-only identity map of the first 16 MiB. This is not process isolation or a complete virtual-memory subsystem.
-- A small RAM filesystem and a simple fixed-sector BreadFS v1 filesystem over primary-master ATA PIO. Both support directory paths and file moves, but remain limited to 16 total file/directory entries, 15 characters per path, and 255 bytes per file; BreadFS is not a general-purpose filesystem.
-- Serial console output for boot diagnostics and a QEMU smoke test.
+- Multiboot v1 boot through GRUB, requesting a 1024×768×32 RGB graphics mode with a VGA text fallback.
+- Validated Multiboot RGB framebuffer discovery and mapping into a dedicated virtual window, with clipped pixel and rectangle drawing primitives.
+- GDT setup, TSS, IDT exception stubs, remapped PIC, and a 100 Hz PIT tick counter.
+- Physical frame bitmap initialized from the Multiboot memory map; allocation remains restricted to the first 16 MiB identity-mapped region.
+- Fixed 256 KiB kernel heap and bootstrap supervisor paging.
+- Polling PS/2 keyboard shell and serial diagnostics.
+- Small RAM filesystem and fixed-sector ATA PIO-backed BreadFS v1. Both remain limited to 16 total entries, 15-character paths, and 255 bytes per file.
+- Round-robin kernel-thread scheduler groundwork.
+- Host regression tests for filesystems, keyboard translation, task switching, and framebuffer drawing; QEMU boot/persistence smoke test.
 
-The shell currently provides `help`, `about`, `memory`, `storage`, `uptime`, `tasks`, `ls`, `mkdir PATH`, `rmdir PATH`, `cat PATH`, `write PATH TEXT`, `mv SOURCE DEST`, `rm PATH`, `clear`, `reboot`, and `halt`. Paths are relative to the root (there is no current-directory command yet). Example: `mkdir docs`, `write docs/note.txt hello`, `mv docs/note.txt note.txt`, `cat note.txt`, `rmdir docs`.
+The shell provides `help`, `about`, `video`, `memory`, `storage`, `uptime`, `tasks`, `ls`, `mkdir PATH`, `rmdir PATH`, `cat PATH`, `write PATH TEXT`, `mv SOURCE DEST`, `rm PATH`, `clear`, `reboot`, and `halt`.
 
-## Build requirements
+## Build
 
-On a Debian/Ubuntu Linux host, install the build and emulator dependencies:
+On Debian/Ubuntu, install:
 
 ```sh
 sudo apt-get update
 sudo apt-get install build-essential binutils gcc-multilib grub-pc-bin grub-common xorriso mtools qemu-system-x86
 ```
 
-Build and run the checks:
+Build and test:
 
 ```sh
 make clean iso
@@ -32,36 +33,22 @@ make test
 make run
 ```
 
-The build produces `build/kernel.elf` and `build/breados.iso`. `make test` runs host-side filesystem and keyboard regression tests, then boots the ISO in QEMU and checks serial startup output and persistence across two boots. These are smoke/regression tests, not proof of full hardware compatibility or complete OS behavior.
+## Omarchy feature port
 
-## Disk safety
+The Omarchy project is being used to identify desktop, workflow, application, customization, installation, update, and quality-of-life features to reimplement natively. BreadOS must not acquire Linux, Arch, systemd, pacman, Wayland, Hyprland, Quickshell, D-Bus, or Linux userspace ABI dependencies.
 
-`make run` uses `build/breados-disk.img`. The smoke test recreates this file as a zero-filled 16 MiB image. Use a disposable emulator image only; never point the emulator at a physical drive or an image containing data that must be preserved.
-
-BreadFS initializes a disk only when its first sector is blank. If the first sector contains an unrecognized format, the kernel leaves it unchanged and falls back to the RAM filesystem. This guard is not a substitute for backups.
+The first native graphics foundation is now implemented in `video.c` and `paging.c`. This is not yet a graphical desktop, window manager, compositor, application framework, or full Omarchy port. Those require user-mode processes, syscalls, IPC, drivers, storage, and further graphics work.
 
 ## Known limitations
 
-BreadOS does not yet provide user-mode processes, system calls, scheduling, privilege-isolated address spaces, a complete virtual-memory manager, a general-purpose on-disk filesystem, USB support, networking, Wi-Fi, audio, a graphical desktop, application compatibility, secure updates, or Android/ARM64 hardware support. The TSS and user-mode GDT entries are setup groundwork only; user-mode execution is not implemented.
+No user-mode execution, syscall ABI, process isolation, complete virtual-memory manager, general VFS, USB, networking, Wi-Fi, audio, GPU acceleration, window manager, compositor, application compatibility, secure package manager, transactional updates, installer, or Android/ARM64 support is implemented. The framebuffer renderer supports 24/32-bit RGB modes only and maps at most one 4 MiB physical window. The existing shell remains VGA text-based; the framebuffer currently provides graphics primitives and a minimal boot surface, not a complete desktop.
 
-The paging implementation maps only the first 16 MiB. The physical frame allocator therefore refuses to allocate frames outside that mapped region. The heap is a fixed, single-core arena and is not backed by the physical frame allocator.
+## Disk safety
 
-## Project structure
+`make run` uses `build/breados-disk.img`. The smoke test recreates this as a zero-filled 16 MiB image. Use disposable emulator images only; never point the emulator at a physical drive or an image containing data that must be preserved.
 
-- `boot.s`, `linker.ld`, `grub.cfg`: boot entry, memory layout, and GRUB configuration.
-- `kernel.c`: kernel initialization and command shell.
-- `memory.c`, `paging.c`, `heap.c`: physical-frame tracking, bootstrap paging, and heap.
-- `gdt.c`, `gdt_load.s`, `interrupts.c`, `interrupts.s`: segmentation and interrupt setup.
-- `kernel/keyboard.c`: PS/2 Set 1 keyboard translation and polling.
-- `fs.c`, `pfs.c`, `ata.c`: RAM filesystem, BreadFS directory/path handling, and ATA PIO driver.
-- `tests/filesystem-host.c`, `tests/keyboard-host.c`: host-side regression tests.
-- `tests/boot-smoke.sh`: QEMU serial boot smoke test.
-- `.github/workflows/build.yml`: CI build and smoke test.
+BreadFS initializes a disk only when its first sector is blank. If the first sector contains an unrecognized format, the kernel leaves it unchanged and falls back to the RAM filesystem.
 
-## Omarchy feature-port reference
+## Third-party licensing
 
-The Omarchy project is being used as a feature and usability reference for a native BreadOS desktop. BreadOS keeps its own kernel; Linux, Arch Linux, Hyprland, Quickshell, systemd, pacman, and the Linux userspace ABI are not runtime dependencies. The extraction and native-port plan is documented in [docs/OMARCHY_NATIVE_PORT.md](docs/OMARCHY_NATIVE_PORT.md). Third-party licensing notes are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-## Contributing
-
-Changes to kernel or storage behavior should be validated with a clean build and QEMU test. Treat disk images as disposable test fixtures and describe unimplemented functionality as planned work rather than an existing feature.
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Omarchy source code is MIT-licensed, but individual bundled fonts, wallpapers, icons, and other assets require separate license and provenance checks before reuse.
