@@ -89,8 +89,8 @@ $(BUILD)/menu-host-test: tests/menu-host.c menu.c menu.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/menu-host.c menu.c -o $@
 $(BUILD)/notification-host-test: tests/notification-host.c notification.c notification.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/notification-host.c notification.c -o $@
-$(BUILD)/clipboard-host-test: tests/clipboard-host.c clipboard.c clipboard.h | $(BUILD)
-	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/clipboard-host.c clipboard.c -o $@
+$(BUILD)/clipboard-host-test: tests/clipboard-host.c clipboard.c clipboard.h secure_memory.c secure_memory.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/clipboard-host.c clipboard.c secure_memory.c -o $@
 $(BUILD)/reminder-host-test: tests/reminder-host.c reminder.c reminder.h notification.c notification.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/reminder-host.c reminder.c notification.c -o $@
 $(BUILD)/idle-host-test: tests/idle-host.c idle.c idle.h | $(BUILD)
@@ -107,7 +107,7 @@ iso: $(BUILD)/breados.iso
 run: iso
 	test -f $(BUILD)/breados-disk.img || truncate -s 16M $(BUILD)/breados-disk.img
 	qemu-system-i386 -drive file=$(BUILD)/breados-disk.img,format=raw,if=ide,index=0 -cdrom $(BUILD)/breados.iso -serial stdio
-test: iso $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test $(BUILD)/theme-host-test $(BUILD)/menu-host-test $(BUILD)/notification-host-test $(BUILD)/clipboard-host-test $(BUILD)/reminder-host-test $(BUILD)/idle-host-test $(BUILD)/launcher-host-test
+test: iso $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test $(BUILD)/theme-host-test $(BUILD)/menu-host-test $(BUILD)/notification-host-test $(BUILD)/clipboard-host-test $(BUILD)/reminder-host-test $(BUILD)/idle-host-test $(BUILD)/launcher-host-test $(BUILD)/privacy-host-test $(BUILD)/secure-memory-host-test
 	$(BUILD)/filesystem-host-test
 	$(BUILD)/keyboard-host-test
 	$(BUILD)/task-host-test
