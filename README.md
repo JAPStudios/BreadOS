@@ -6,7 +6,7 @@ BreadOS is a freestanding 32-bit x86 operating system with its own kernel and na
 
 - Multiboot v1 boot through GRUB, VGA fallback, and validated 24/32-bit RGB framebuffer support.
 - Native framebuffer drawing, glyph rendering, and graphical text output.
-- GDT, TSS, IDT exceptions, remapped PIC, 100 Hz PIT, physical frame allocator, bootstrap paging, and fixed kernel heap.
+- GDT, TSS, IDT exceptions, remapped PIC, 100 Hz PIT, physical frame allocator, bootstrap paging, and a hardened fixed kernel heap with allocation canaries, guarded block metadata, allocation/free poisoning, and an integrity checker.
 - PS/2 keyboard IRQ1 input, PS/2 mouse IRQ12 packet decoding, bounded input queues, and serial diagnostics.
 - RAM filesystem and ATA PIO-backed BreadFS v1. Storage is currently limited to 16 entries, 15-character paths, and 255-byte files.
 - Round-robin kernel-thread scheduler and a preemptible ring-3 demonstration program using two user-mapped pages and an `int 0x80` write/exit syscall path.

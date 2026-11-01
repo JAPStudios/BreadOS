@@ -75,6 +75,8 @@ $(BUILD)/breados.iso: $(BUILD)/kernel.elf grub.cfg
 	cp $(BUILD)/kernel.elf $(BUILD)/iso/boot/kernel.elf
 	cp grub.cfg $(BUILD)/iso/boot/grub/grub.cfg
 	grub-mkrescue -o $@ $(BUILD)/iso
+$(BUILD)/heap-host-test: tests/heap-host.c heap.c heap.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/heap-host.c heap.c -o $@
 $(BUILD)/filesystem-host-test: tests/filesystem-host.c fs.c pfs.c fs.h pfs.h ata.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/filesystem-host.c fs.c pfs.c -o $@
 $(BUILD)/keyboard-host-test: tests/keyboard-host.c kernel/keyboard.c kernel/keyboard.h | $(BUILD)
@@ -107,7 +109,8 @@ iso: $(BUILD)/breados.iso
 run: iso
 	test -f $(BUILD)/breados-disk.img || truncate -s 16M $(BUILD)/breados-disk.img
 	qemu-system-i386 -drive file=$(BUILD)/breados-disk.img,format=raw,if=ide,index=0 -cdrom $(BUILD)/breados.iso -serial stdio
-test: iso $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test $(BUILD)/theme-host-test $(BUILD)/menu-host-test $(BUILD)/notification-host-test $(BUILD)/clipboard-host-test $(BUILD)/reminder-host-test $(BUILD)/idle-host-test $(BUILD)/launcher-host-test $(BUILD)/privacy-host-test $(BUILD)/secure-memory-host-test
+test: iso $(BUILD)/heap-host-test $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test $(BUILD)/theme-host-test $(BUILD)/menu-host-test $(BUILD)/notification-host-test $(BUILD)/clipboard-host-test $(BUILD)/reminder-host-test $(BUILD)/idle-host-test $(BUILD)/launcher-host-test $(BUILD)/privacy-host-test $(BUILD)/secure-memory-host-test
+	$(BUILD)/heap-host-test
 	$(BUILD)/filesystem-host-test
 	$(BUILD)/keyboard-host-test
 	$(BUILD)/task-host-test

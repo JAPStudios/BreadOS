@@ -5,8 +5,9 @@
 #include <stdint.h>
 
 /* Kernel heap: 256 KiB static arena, 16-byte aligned allocations.
- * Initialize once during boot before calling heap_alloc/heap_free.
- * This is a single-core kernel allocator; SMP locking is not implemented.
+ * Allocations have an address/size-bound trailing canary; block headers have
+ * integrity guards; freed payloads are poisoned. Initialize once during boot.
+ * This remains a single-core allocator; SMP locking is not implemented.
  */
 void heap_init(void);
 void *heap_alloc(size_t size);
@@ -14,5 +15,7 @@ void *heap_calloc(size_t count, size_t size);
 void heap_free(void *pointer);
 size_t heap_bytes_used(void);
 size_t heap_bytes_capacity(void);
+/* Returns 1 only when the complete block chain and all live canaries validate. */
+int heap_check_integrity(void);
 
 #endif
