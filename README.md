@@ -9,10 +9,10 @@ BreadOS is an experimental, freestanding 32-bit x86 operating-system kernel. It 
 - GDT setup, TSS, IDT exception stubs, remapped PIC, and a 100 Hz PIT tick counter.
 - Physical frame bitmap initialized from the Multiboot memory map; allocation remains restricted to the first 16 MiB identity-mapped region.
 - Fixed 256 KiB kernel heap and bootstrap supervisor paging.
-- Polling PS/2 keyboard shell and serial diagnostics.
+- PS/2 keyboard controller initialization, IRQ1 input delivery, a bounded character queue, and polling fallback; serial diagnostics.
 - Small RAM filesystem and fixed-sector ATA PIO-backed BreadFS v1. Both remain limited to 16 total entries, 15-character paths, and 255 bytes per file.
 - Round-robin kernel-thread scheduler groundwork.
-- Host regression tests for filesystems, keyboard translation, task switching, and framebuffer drawing/text; QEMU boot/persistence smoke test.
+- Host regression tests for filesystems, keyboard translation and input-queue behavior, task switching, and framebuffer drawing/text; QEMU boot/persistence smoke test.
 
 The shell provides `help`, `about`, `video`, `memory`, `storage`, `uptime`, `tasks`, `ls`, `mkdir PATH`, `rmdir PATH`, `cat PATH`, `write PATH TEXT`, `mv SOURCE DEST`, `rm PATH`, `clear`, `reboot`, and `halt`.
 
