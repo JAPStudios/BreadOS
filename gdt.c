@@ -56,6 +56,10 @@ static void set_entry(unsigned index, uint32_t base, uint32_t limit,
     gdt[index].base_high = (uint8_t)((base >> 24) & 0xFFu);
 }
 
+void gdt_set_kernel_stack(uint32_t stack_pointer) {
+    tss.esp0 = stack_pointer;
+}
+
 void gdt_init(void) {
     for (unsigned i = 0; i < GDT_ENTRIES; ++i) {
         set_entry(i, 0, 0, 0, 0);

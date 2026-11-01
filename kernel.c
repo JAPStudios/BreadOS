@@ -11,6 +11,8 @@
 #include "task.h"
 #include "kernel/keyboard.h"
 #include "kernel/mouse.h"
+#include "process.h"
+#include "console.h"
 #define W 80
 #define H 25
 #define MB_MAGIC 0x2BADB002u
@@ -38,6 +40,7 @@ static void put(char c){
     for(unsigned i=0;i<100000;i++)if(inb(COM1+5)&0x20){outb(COM1,c);break;}
 }
 static void puts(const char*s){while(*s)put(*s++);}
+void console_put_char(char c){put(c);}
 static void clear(void){for(size_t i=0;i<W*H;i++)vga[i]=0x0F20;row=col=0;if(video_available())video_console_clear(0x101820u,0xE6E6E6u);}
 static int eq(const char*a,const char*b){while(*a&&*b&&*a==*b){a++;b++;}return *a==*b;}
 static void hex32(uint32_t value){static const char d[]="0123456789ABCDEF";for(int s=28;s>=0;s-=4)put(d[(value>>s)&15u]);}
@@ -59,9 +62,10 @@ static void command(void){
     while(*end && *end!=' ')++end;
     char *rest=end;
     if(*end){*end++=0;while(*end==' ')++end;rest=end;}else rest=end;
-    if(eq(arg,"help"))puts("Commands: help, about, video, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
+    if(eq(arg,"help"))puts("Commands: help, about, video, userdemo, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
     else if(eq(arg,"about"))puts("BreadOS: freestanding 32-bit x86 kernel; Multiboot v1 boot.\n");
     else if(eq(arg,"video")){if(video_available()){puts("Framebuffer: ");hex32(video_width());puts(" x ");hex32(video_height());puts(" RGB\n");}else puts("No supported RGB framebuffer; VGA text console remains active.\n");}
+    else if(eq(arg,"userdemo")){int result=process_run_user_demo();if(result==0)puts("Ring-3 process exited successfully.\n");else puts("Ring-3 process failed.\n");}
     else if(eq(arg,"memory")){puts("Free 4 KiB frames: 0x");hex32(memory_free_frames());puts("\n");}
     else if(eq(arg,"storage")){if(pfs_ready())puts("Persistent BreadFS on ATA primary-master disk.\n");else puts("Volatile RAM filesystem; no usable BreadFS volume.\n");}
     else if(eq(arg,"uptime")){puts("PIT ticks at 100 Hz: ");hex32(timer_ticks());puts("\n");}
@@ -95,6 +99,9 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     if(mouse_init(video_available()?video_width():640u,video_available()?video_height():480u)==0)puts("PS/2 mouse IRQ12 configured.\n");else puts("PS/2 mouse unavailable.\n");
     puts("Type help for commands.\n");interrupts_init();
     while(task_switch_count()<6u){__asm__ volatile("hlt");}
-    puts("Scheduler smoke test passed: round-robin task switching verified.\n");prompt();
+    puts("Scheduler smoke test passed: round-robin task switching verified.\n");
+    int user_result=process_run_user_demo();
+    if(user_result==0)puts("Ring-3 process and syscall smoke test passed.\n");else puts("Ring-3 process and syscall smoke test failed.\n");
+    prompt();
     for(;;){char c;if(!keyboard_read_char(&c)){__asm__ volatile("pause");continue;}if(c=='\n'){command();continue;}if(c=='\b'){if(n){n--;put('\b');put(' ');put('\b');}continue;}if(n<sizeof(line)-1){line[n++]=c;put(c);}}
 }

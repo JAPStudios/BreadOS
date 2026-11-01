@@ -11,10 +11,10 @@ BreadOS is an experimental, freestanding 32-bit x86 operating-system kernel. It 
 - Fixed 256 KiB kernel heap and bootstrap supervisor paging.
 - PS/2 keyboard IRQ1 character queue with polling fallback, plus PS/2 mouse IRQ12 packet decoding and bounded pointer-event queue; serial diagnostics.
 - Small RAM filesystem and fixed-sector ATA PIO-backed BreadFS v1. Both remain limited to 16 total entries, 15-character paths, and 255 bytes per file.
-- Round-robin kernel-thread scheduler groundwork.
+- Round-robin kernel-thread scheduler with a preemptible ring-3 demonstration process, two user-mapped pages, and an `int 0x80` character-write/exit syscall path.
 - Host regression tests for filesystems, keyboard translation and input-queue behavior, mouse packet decoding, task switching, and framebuffer drawing/text; QEMU boot/persistence smoke test.
 
-The shell provides `help`, `about`, `video`, `memory`, `storage`, `uptime`, `tasks`, `ls`, `mkdir PATH`, `rmdir PATH`, `cat PATH`, `write PATH TEXT`, `mv SOURCE DEST`, `rm PATH`, `clear`, `reboot`, and `halt`.
+The shell provides `help`, `about`, `video`, `userdemo`, `memory`, `storage`, `uptime`, `tasks`, `ls`, `mkdir PATH`, `rmdir PATH`, `cat PATH`, `write PATH TEXT`, `mv SOURCE DEST`, `rm PATH`, `clear`, `reboot`, and `halt`.
 
 ## Build
 
@@ -41,7 +41,7 @@ A native framebuffer text console and drawing foundation are implemented in `vid
 
 ## Known limitations
 
-No user-mode execution, syscall ABI, process isolation, complete virtual-memory manager, general VFS, USB, networking, Wi-Fi, audio, GPU acceleration, window manager, compositor, application compatibility, secure package manager, transactional updates, installer, or Android/ARM64 support is implemented. The framebuffer renderer supports 24/32-bit RGB modes only and maps at most one 4 MiB physical window. The shell can render through the framebuffer text console when GRUB supplies a supported RGB mode, and falls back to VGA text otherwise. No windowed desktop exists yet.
+The only ring-3 execution path is a fixed smoke-test program with two user pages and two system calls. The QEMU boot test checks that it survives timer preemption, writes through `int 0x80`, and exits back to the kernel shell. BreadOS does not yet have independent per-process page directories, a general executable loader, process lifecycle management, IPC, a general syscall ABI, or user account/permission services. A complete virtual-memory manager, general VFS, USB, networking, Wi-Fi, audio, GPU acceleration, window manager, compositor, application compatibility, secure package manager, transactional updates, installer, and Android/ARM64 support are also not implemented. The framebuffer renderer supports 24/32-bit RGB modes only and maps at most one 4 MiB physical window. The shell can render through the framebuffer text console when GRUB supplies a supported RGB mode, and falls back to VGA text otherwise. No windowed desktop exists yet.
 
 ## Disk safety
 

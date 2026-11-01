@@ -62,6 +62,11 @@ irq12:
     pushl $0
     pushl $44
     jmp isr_common
+.global syscall80
+syscall80:
+    pushl $0
+    pushl $128
+    jmp isr_common
 isr_common:
     pusha
     movl %esp, %eax
