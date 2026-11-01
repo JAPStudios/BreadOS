@@ -102,7 +102,10 @@ void mouse_feed_byte(uint8_t value) {
 }
 
 void mouse_irq_handler(void) {
-    if (enabled && (inb(0x64u)&1u)) mouse_feed_byte(inb(0x60u));
+    if (inb(0x64u)&1u) {
+        uint8_t value=inb(0x60u);
+        if (enabled) mouse_feed_byte(value);
+    }
 }
 
 int mouse_read_event(struct mouse_event *event) {

@@ -60,7 +60,7 @@ static void pic_remap(void) {
     outb(PIC1_DATA, 0x20); outb(PIC2_DATA, 0x28);
     outb(PIC1_DATA, 0x04); outb(PIC2_DATA, 0x02);
     outb(PIC1_DATA, 0x01); outb(PIC2_DATA, 0x01);
-    /* Enable only IRQ0 (PIT timer); keep every other hardware IRQ masked. */
+    /* Enable PIT IRQ0, keyboard IRQ1, cascade IRQ2, and mouse IRQ12 only. */
     outb(PIC1_DATA, 0xF8); outb(PIC2_DATA, 0xEF);
 }
 void interrupts_init(void) {
