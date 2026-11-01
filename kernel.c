@@ -17,6 +17,7 @@
 #include "menu.h"
 #include "desktop.h"
 #include "notification.h"
+#include "clipboard.h"
 #define W 80
 #define H 25
 #define MB_MAGIC 0x2BADB002u
@@ -85,11 +86,33 @@ static void command(void){
     while(*end && *end!=' ')++end;
     char *rest=end;
     if(*end){*end++=0;while(*end==' ')++end;rest=end;}else rest=end;
-    if(eq(arg,"help"))puts("Commands: help, menu [SEARCH], history, theme [NAME], desktop, notify TEXT, notifications, snooze INDEX TICKS, dismiss INDEX, dnd [on|off], about, video, userdemo, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
+    if(eq(arg,"help"))puts("Commands: help, menu [SEARCH], history, theme [NAME], desktop, notify TEXT, notifications, snooze INDEX TICKS, dismiss INDEX, dnd [on|off], clipboard, about, video, userdemo, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
     else if(eq(arg,"menu")){size_t shown=0;puts("BreadOS command palette\n");for(size_t i=0;i<shell_menu_count();i++){const struct shell_menu_entry *entry=shell_menu_at(i);if(shell_menu_matches(entry,rest)){puts("[");puts(entry->category);puts("] ");puts(entry->command);puts(" - ");puts(entry->description);puts("\n");shown++;}}if(!shown)puts("No matching commands.\n");}
     else if(eq(arg,"history")){uint32_t start=(history_head+HISTORY_CAPACITY-history_count)%HISTORY_CAPACITY;for(uint32_t i=0;i<history_count;i++){uint32_t slot=(start+i)%HISTORY_CAPACITY;hex32(i+1u);puts("  ");puts(command_history[slot]);puts("\n");}}
     else if(eq(arg,"theme")){if(!*rest){puts("Current theme: ");puts(theme_current()->name);puts("\nAvailable themes: ");for(size_t i=0;i<theme_count();i++){if(i)puts(", ");puts(theme_at(i)->name);}puts("\n");}else if(theme_apply(rest)==0){clear();if(file_write("theme",theme_current()->name)>=0){puts("Theme applied and saved: ");puts(theme_current()->name);puts("\n");}else puts("Theme applied, but could not be saved to storage.\n");}else puts("Unknown theme. Run theme to list available themes.\n");}
     else if(eq(arg,"desktop")){int result=desktop_run();clear();if(result==0)puts("Returned to BreadOS shell.\n");else puts("Graphical desktop unavailable; an RGB framebuffer of at least 320x240 is required.\n");}
+    else if(eq(arg,"clipboard")) {
+        char *mode=rest;
+        while(*mode==' ')mode++;
+        char *payload=mode;
+        while(*payload && *payload!=' ')payload++;
+        if(*payload){*payload++=0;while(*payload==' ')payload++;}
+        if(eq(mode,"copy")) {
+            if(!*payload) puts("Usage: clipboard copy TEXT\n");
+            else {clipboard_set(payload,0);puts("Copied to BreadOS clipboard.\n");}
+        } else if(eq(mode,"sensitive")) {
+            if(!*payload) puts("Usage: clipboard sensitive TEXT\n");
+            else {clipboard_set(payload,1);puts("Copied; sensitive text excluded from history.\n");}
+        } else if(eq(mode,"paste")) {
+            puts(clipboard_current());puts("\n");
+        } else if(eq(mode,"history")) {
+            size_t count=clipboard_history_count();
+            if(!count) puts("Clipboard history is empty.\n");
+            for(size_t i=0;i<count;i++){const char *entry=clipboard_history_at(i);if(entry){hex32(i);puts("  ");puts(entry);puts("\n");}}
+        } else if(eq(mode,"clear")) {
+            clipboard_clear();puts("Clipboard and history cleared.\n");
+        } else puts("Usage: clipboard copy|sensitive|paste|history|clear [TEXT]\n");
+    }
     else if(eq(arg,"notify")){if(!*rest)puts("Usage: notify TEXT\n");else if(notification_push("BreadOS","Notice",rest,timer_ticks()))puts("Notification stored; Do Not Disturb is suppressing alerts.\n");else puts("Notification queued.\n");}
     else if(eq(arg,"notifications")){size_t count=notification_count();if(!count)puts("No notifications.\n");for(size_t i=0;i<count;i++){const struct bread_notification *entry=notification_get(i);if(entry){puts(entry->sender);puts(": ");puts(entry->title);puts(" - ");puts(entry->body);if(entry->dismissed)puts(" [dismissed]");else if(entry->snoozed_until && (int32_t)(timer_ticks()-entry->snoozed_until)<0)puts(" [snoozed]");puts("\n");}}}
     else if(eq(arg,"snooze")) {

@@ -28,7 +28,8 @@ static const struct shell_menu_entry entries[] = {
     {"Notifications","notifications","Review retained notification history"},
     {"Notifications","dnd [on|off]","Toggle Do Not Disturb"},
     {"Notifications","snooze INDEX TICKS","Temporarily hide a retained notification"},
-    {"Notifications","dismiss INDEX","Dismiss a retained notification"}
+    {"Notifications","dismiss INDEX","Dismiss a retained notification"},
+    {"Clipboard","clipboard copy|sensitive|paste|history|clear","Manage native clipboard contents and retained history"}
 };
 
 static char lower_ascii(char value) {

@@ -6,6 +6,7 @@
 #include "kernel/keyboard.h"
 #include "kernel/mouse.h"
 #include "notification.h"
+#include "clipboard.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -16,6 +17,7 @@
 #define APP_APPEARANCE 2u
 #define APP_SYSTEM 3u
 #define APP_NOTIFICATIONS 4u
+#define APP_CLIPBOARD 5u
 #define LAYOUT_DWINDLE 0u
 #define LAYOUT_SCROLL 1u
 #define LAYOUT_FLOAT 2u
@@ -44,6 +46,7 @@ static const char *app_title(uint8_t app) {
         case APP_APPEARANCE:return "Appearance";
         case APP_SYSTEM:return "System";
         case APP_NOTIFICATIONS:return "Notifications";
+        case APP_CLIPBOARD:return "Clipboard";
         default:return "Shell";
     }
 }
@@ -164,6 +167,17 @@ static void draw_window(uint32_t index) {
             uint32_t fg=entry==theme_current()?entry->background:theme->foreground;
             text(px,py,entry->name,fg,bg);
         }
+    } else if(w->app==APP_CLIPBOARD) {
+        text(tx,ty,"CURRENT CLIPBOARD",theme->accent,theme->background);ty+=20u;
+        text(tx,ty,clipboard_current(),theme->foreground,theme->background);ty+=28u;
+        text(tx,ty,"HISTORY - CLICK TO RESTORE",theme->accent,theme->background);ty+=22u;
+        size_t count=clipboard_history_count();
+        if(!count) text(tx,ty,"No retained entries.",theme->foreground,theme->background);
+        for(size_t i=0;i<count && i<6u;i++) {
+            const char *entry=clipboard_history_at(i);
+            if(entry) text(tx,ty,entry,theme->foreground,theme->background);
+            ty+=18u;
+        }
     } else if(w->app==APP_NOTIFICATIONS) {
         text(tx,ty,"NOTIFICATION HISTORY",theme->accent,theme->background);ty+=24u;
         size_t count=notification_count();
@@ -184,7 +198,8 @@ static void draw_window(uint32_t index) {
         text(tx,ty,"[ / ]  Switch workspace",theme->foreground,theme->background);ty+=18u;
         text(tx,ty,"L  Cycle layouts",theme->foreground,theme->background);ty+=18u;
         text(tx,ty,", / .  Scroll layout",theme->foreground,theme->background);ty+=18u;
-        text(tx,ty,"N  Notifications  D  Do Not Disturb",theme->foreground,theme->background);ty+=18u;
+        text(tx,ty,"N  Notifications  C  Clipboard",theme->foreground,theme->background);ty+=18u;
+        text(tx,ty,"D  Do Not Disturb",theme->foreground,theme->background);ty+=18u;
         text(tx,ty,"Q  Return to kernel console",theme->foreground,theme->background);
     }
 }
@@ -299,6 +314,9 @@ static void mouse_event(const struct mouse_event *event) {
                     else if(workspace_layout[active_workspace]==LAYOUT_FLOAT) {
                         dragging=i;drag_x=(int32_t)pointer_x-(int32_t)view.x;drag_y=(int32_t)pointer_y-(int32_t)view.y;
                     }
+                } else if(w->app==APP_CLIPBOARD && pointer_y>=view.y+80u) {
+                    uint32_t row=(pointer_y-(view.y+80u))/18u;
+                    if(row<clipboard_history_count() && row<6u) clipboard_restore(row);
                 } else if(w->app==APP_NOTIFICATIONS && pointer_y>=view.y+58u) {
                     uint32_t row=(pointer_y-(view.y+58u))/42u;
                     if(row<notification_count() && row<5u) notification_dismiss(row);
@@ -351,6 +369,7 @@ int desktop_run(void) {
             else if(key=='s' || key=='S'){open_app(APP_SYSTEM);changed=1;}
             else if(key=='e' || key=='E'){open_app(APP_SHELL);changed=1;}
             else if(key=='n' || key=='N'){open_app(APP_NOTIFICATIONS);changed=1;}
+            else if(key=='c' || key=='C'){open_app(APP_CLIPBOARD);changed=1;}
             else if(key=='d' || key=='D'){notification_set_dnd(!notification_dnd());changed=1;}
             else if(key=='[' && active_workspace) {switch_workspace(active_workspace-1u);changed=1;}
             else if(key==']' && active_workspace+1u<DESKTOP_WORKSPACES){switch_workspace(active_workspace+1u);changed=1;}
