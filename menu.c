@@ -4,6 +4,7 @@ static const struct shell_menu_entry entries[] = {
     {"System","about","Show BreadOS kernel and boot information"},
     {"System","video","Show framebuffer mode and graphics status"},
     {"System","memory","Show available physical memory frames"},
+    {"Hardware","pci","Enumerate PCI devices and identify controller classes"},
     {"System","heapcheck","Validate kernel heap metadata and live allocation canaries"},
     {"Audio","beep FREQUENCY [DURATION_TICKS]","Play a tone through the PIT-driven PC speaker"},
     {"System","storage","Show active storage backend"},

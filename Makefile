@@ -19,6 +19,8 @@ $(BUILD)/usermode.o: usermode.s | $(BUILD)
 	$(AS) --32 $< -o $@
 $(BUILD)/memory.o: memory.c memory.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
+$(BUILD)/pci.o: pci.c pci.h | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/audio.o: audio.c audio.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/heap.o: heap.c heap.h | $(BUILD)
@@ -69,14 +71,16 @@ $(BUILD)/interrupts.o: interrupts.s | $(BUILD)
 	$(AS) --32 $< -o $@
 $(BUILD)/interrupts_c.o: interrupts.c interrupts.h task.h video.h kernel/keyboard.h kernel/mouse.h syscall.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
-$(BUILD)/kernel.elf: $(BUILD)/audio.o $(BUILD)/boot.o $(BUILD)/gdt.o $(BUILD)/gdt_load.o $(BUILD)/usermode.o $(BUILD)/process.o $(BUILD)/syscall.o $(BUILD)/kernel.o $(BUILD)/keyboard.o $(BUILD)/mouse.o $(BUILD)/memory.o $(BUILD)/heap.o $(BUILD)/fs.o $(BUILD)/ata.o $(BUILD)/pfs.o $(BUILD)/paging.o $(BUILD)/video.o $(BUILD)/theme.o $(BUILD)/menu.o $(BUILD)/desktop.o $(BUILD)/notification.o $(BUILD)/clipboard.o $(BUILD)/reminder.o $(BUILD)/idle.o $(BUILD)/launcher.o $(BUILD)/privacy.o $(BUILD)/secure_memory.o $(BUILD)/task.o $(BUILD)/interrupts.o $(BUILD)/interrupts_c.o linker.ld
-	$(LD) $(LDFLAGS) -o $@ $(BUILD)/audio.o $(BUILD)/boot.o $(BUILD)/gdt.o $(BUILD)/gdt_load.o $(BUILD)/usermode.o $(BUILD)/process.o $(BUILD)/syscall.o $(BUILD)/interrupts.o $(BUILD)/interrupts_c.o $(BUILD)/memory.o $(BUILD)/heap.o $(BUILD)/fs.o $(BUILD)/ata.o $(BUILD)/pfs.o $(BUILD)/paging.o $(BUILD)/video.o $(BUILD)/theme.o $(BUILD)/menu.o $(BUILD)/desktop.o $(BUILD)/notification.o $(BUILD)/clipboard.o $(BUILD)/reminder.o $(BUILD)/idle.o $(BUILD)/launcher.o $(BUILD)/privacy.o $(BUILD)/secure_memory.o $(BUILD)/task.o $(BUILD)/keyboard.o $(BUILD)/mouse.o $(BUILD)/kernel.o
+$(BUILD)/kernel.elf: $(BUILD)/pci.o $(BUILD)/audio.o $(BUILD)/boot.o $(BUILD)/gdt.o $(BUILD)/gdt_load.o $(BUILD)/usermode.o $(BUILD)/process.o $(BUILD)/syscall.o $(BUILD)/kernel.o $(BUILD)/keyboard.o $(BUILD)/mouse.o $(BUILD)/memory.o $(BUILD)/heap.o $(BUILD)/fs.o $(BUILD)/ata.o $(BUILD)/pfs.o $(BUILD)/paging.o $(BUILD)/video.o $(BUILD)/theme.o $(BUILD)/menu.o $(BUILD)/desktop.o $(BUILD)/notification.o $(BUILD)/clipboard.o $(BUILD)/reminder.o $(BUILD)/idle.o $(BUILD)/launcher.o $(BUILD)/privacy.o $(BUILD)/secure_memory.o $(BUILD)/task.o $(BUILD)/interrupts.o $(BUILD)/interrupts_c.o linker.ld
+	$(LD) $(LDFLAGS) -o $@ $(BUILD)/pci.o $(BUILD)/audio.o $(BUILD)/boot.o $(BUILD)/gdt.o $(BUILD)/gdt_load.o $(BUILD)/usermode.o $(BUILD)/process.o $(BUILD)/syscall.o $(BUILD)/interrupts.o $(BUILD)/interrupts_c.o $(BUILD)/memory.o $(BUILD)/heap.o $(BUILD)/fs.o $(BUILD)/ata.o $(BUILD)/pfs.o $(BUILD)/paging.o $(BUILD)/video.o $(BUILD)/theme.o $(BUILD)/menu.o $(BUILD)/desktop.o $(BUILD)/notification.o $(BUILD)/clipboard.o $(BUILD)/reminder.o $(BUILD)/idle.o $(BUILD)/launcher.o $(BUILD)/privacy.o $(BUILD)/secure_memory.o $(BUILD)/task.o $(BUILD)/keyboard.o $(BUILD)/mouse.o $(BUILD)/kernel.o
 	grub-file --is-x86-multiboot $@
 $(BUILD)/breados.iso: $(BUILD)/kernel.elf grub.cfg
 	mkdir -p $(BUILD)/iso/boot/grub
 	cp $(BUILD)/kernel.elf $(BUILD)/iso/boot/kernel.elf
 	cp grub.cfg $(BUILD)/iso/boot/grub/grub.cfg
 	grub-mkrescue -o $@ $(BUILD)/iso
+$(BUILD)/pci-host-test: tests/pci-host.c pci.c pci.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/pci-host.c pci.c -o $@
 $(BUILD)/audio-host-test: tests/audio-host.c audio.c audio.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/audio-host.c audio.c -o $@
 $(BUILD)/heap-host-test: tests/heap-host.c heap.c heap.h | $(BUILD)
@@ -113,7 +117,8 @@ iso: $(BUILD)/breados.iso
 run: iso
 	test -f $(BUILD)/breados-disk.img || truncate -s 16M $(BUILD)/breados-disk.img
 	qemu-system-i386 -drive file=$(BUILD)/breados-disk.img,format=raw,if=ide,index=0 -cdrom $(BUILD)/breados.iso -serial stdio
-test: iso $(BUILD)/audio-host-test $(BUILD)/heap-host-test $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test $(BUILD)/theme-host-test $(BUILD)/menu-host-test $(BUILD)/notification-host-test $(BUILD)/clipboard-host-test $(BUILD)/reminder-host-test $(BUILD)/idle-host-test $(BUILD)/launcher-host-test $(BUILD)/privacy-host-test $(BUILD)/secure-memory-host-test
+test: iso $(BUILD)/pci-host-test $(BUILD)/audio-host-test $(BUILD)/heap-host-test $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test $(BUILD)/theme-host-test $(BUILD)/menu-host-test $(BUILD)/notification-host-test $(BUILD)/clipboard-host-test $(BUILD)/reminder-host-test $(BUILD)/idle-host-test $(BUILD)/launcher-host-test $(BUILD)/privacy-host-test $(BUILD)/secure-memory-host-test
+	$(BUILD)/pci-host-test
 	$(BUILD)/audio-host-test
 	$(BUILD)/heap-host-test
 	$(BUILD)/filesystem-host-test

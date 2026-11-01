@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include "interrupts.h"
 #include "audio.h"
+#include "pci.h"
 #include "memory.h"
 #include "heap.h"
 #include "fs.h"
@@ -91,7 +92,7 @@ static void command(void){
     while(*end && *end!=' ')++end;
     char *rest=end;
     if(*end){*end++=0;while(*end==' ')++end;rest=end;}else rest=end;
-    if(eq(arg,"help"))puts("Commands: help, menu [SEARCH], history, theme [NAME], desktop, notify TEXT, notifications, snooze INDEX TICKS, dismiss INDEX, dnd [on|off], clipboard, remind TICKS TEXT, reminders, privacy [list|CAPABILITY on|off], heapcheck, beep FREQUENCY [DURATION_TICKS], about, video, userdemo, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
+    if(eq(arg,"help"))puts("Commands: help, menu [SEARCH], history, theme [NAME], desktop, notify TEXT, notifications, snooze INDEX TICKS, dismiss INDEX, dnd [on|off], clipboard, remind TICKS TEXT, reminders, privacy [list|CAPABILITY on|off], heapcheck, pci, beep FREQUENCY [DURATION_TICKS], about, video, userdemo, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
     else if(eq(arg,"menu")){size_t shown=0;puts("BreadOS command palette\n");for(size_t i=0;i<shell_menu_count();i++){const struct shell_menu_entry *entry=shell_menu_at(i);if(shell_menu_matches(entry,rest)){puts("[");puts(entry->category);puts("] ");puts(entry->command);puts(" - ");puts(entry->description);puts("\n");shown++;}}if(!shown)puts("No matching commands.\n");}
     else if(eq(arg,"history")){uint32_t start=(history_head+HISTORY_CAPACITY-history_count)%HISTORY_CAPACITY;for(uint32_t i=0;i<history_count;i++){uint32_t slot=(start+i)%HISTORY_CAPACITY;hex32(i+1u);puts("  ");puts(command_history[slot]);puts("\n");}}
     else if(eq(arg,"theme")){if(!*rest){puts("Current theme: ");puts(theme_current()->name);puts("\nAvailable themes: ");for(size_t i=0;i<theme_count();i++){if(i)puts(", ");puts(theme_at(i)->name);}puts("\n");}else if(theme_apply(rest)==0){clear();if(file_write("theme",theme_current()->name)>=0){puts("Theme applied and saved: ");puts(theme_current()->name);puts("\n");}else puts("Theme applied, but could not be saved to storage.\n");}else puts("Unknown theme. Run theme to list available themes.\n");}
@@ -210,6 +211,7 @@ static void command(void){
         else puts("PC speaker tone completed.\\n");
     }
     else if(eq(arg,"heapcheck"))puts(heap_check_integrity()?"Kernel heap integrity: OK (block guards and live allocation canaries valid).\n":"Kernel heap integrity: FAILED (corruption detected; inspect before further allocation).\n");
+    else if(eq(arg,"pci")){size_t count=pci_device_count();puts("PCI devices: ");hex32((uint32_t)count);puts("\n");for(size_t i=0;i<count;i++){const struct pci_device *d=pci_device_at(i);if(d){puts("bus ");hex32(d->bus);puts(" dev ");hex32(d->device);puts(" fn ");hex32(d->function);puts(" vendor ");hex32(d->vendor_id);puts(" device ");hex32(d->device_id);puts(" class ");hex32(d->class_code);puts(":");hex32(d->subclass);puts("\n");}}}
     else if(eq(arg,"about"))puts("BreadOS: freestanding 32-bit x86 kernel; Multiboot v1 boot.\n");
     else if(eq(arg,"video")){if(video_available()){puts("Framebuffer: ");hex32(video_width());puts(" x ");hex32(video_height());puts(" RGB\n");}else puts("No supported RGB framebuffer; VGA text console remains active.\n");}
     else if(eq(arg,"userdemo")){int result=process_run_user_demo();if(result==0)puts("Ring-3 process exited successfully.\n");else puts("Ring-3 process failed.\n");}
@@ -239,6 +241,7 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     memory_init(mbi);puts("Physical frame allocator initialized.\n");
     heap_init();if(heap_check_integrity())puts("Hardened kernel heap initialized (256 KiB; integrity verified).\n");else{puts("ERROR: kernel heap integrity check failed at initialization.\n");for(;;)__asm__ volatile("cli; hlt");}
     paging_init();puts("Paging enabled: first 16 MiB identity-mapped.\n");
+    pci_init();puts("PCI configuration-space scan complete.\\n");
     if(video_init(mbi)==0){theme_apply(theme_current()->name);puts("GRUB RGB framebuffer mapped; native graphical text console initialized.\n");}else puts("No supported GRUB RGB framebuffer; VGA text fallback active.\n");
     int storage=pfs_init();if(storage==2)puts("Persistent BreadFS formatted and mounted.\n");else if(storage==1)puts("Persistent BreadFS mounted.\n");else{fs_init();if(storage==0)puts("RAM filesystem initialized (no usable ATA volume).\n");else puts("RAM filesystem initialized (ATA volume not recognized; disk left unchanged).\n");}
     tasking_init();puts("Round-robin kernel scheduler initialized (3 kernel threads).\n");
