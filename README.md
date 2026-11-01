@@ -10,10 +10,11 @@ BreadOS is a freestanding 32-bit x86 operating system with its own kernel and na
 - PS/2 keyboard IRQ1 input, PS/2 mouse IRQ12 packet decoding, bounded input queues, and serial diagnostics.
 - RAM filesystem and ATA PIO-backed BreadFS v1. Storage is currently limited to 16 entries, 15-character paths, and 255-byte files.
 - Round-robin kernel-thread scheduler and a preemptible ring-3 demonstration program using two user-mapped pages and an `int 0x80` write/exit syscall path.
-- Native framebuffer desktop with draggable floating windows, four workspaces, dwindle/scroll/floating layouts, a dock, mouse interaction, and Shell, Files, Appearance, System, and Notifications windows.
+- Native framebuffer desktop with draggable floating windows, four workspaces, dwindle/scroll/floating layouts, a dock, mouse interaction, and Shell, Files, Appearance, System, Notifications, and Clipboard windows. The Files window previews selected BreadFS text files.
 - Twenty-three native color palettes ported from Omarchy theme data. Theme selection persists in BreadFS across reboots.
 - Searchable command palette, 16-entry shell history, and a native notification service with a 16-entry history, stacked alerts, dismissal, snoozing, and Do Not Disturb.
-- Host regression tests for filesystems, keyboard input, mouse packets, task switching, framebuffer rendering, themes, command search, and notifications, plus QEMU boot and persistence tests.
+- Native clipboard history with sensitive-content exclusion, plus timer-based reminders delivered through the notification service.
+- Host regression tests for filesystems, keyboard input, mouse packets, task switching, framebuffer rendering, themes, command search, notifications, clipboard history, and reminders, plus QEMU boot and persistence tests.
 
 ## Shell commands
 

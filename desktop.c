@@ -31,9 +31,11 @@ struct desktop_window {
 extern uint32_t timer_ticks(void);
 extern size_t bread_file_count(void);
 extern const char *bread_file_name(size_t index);
+extern int bread_file_read(const char *name,char *out,size_t capacity);
 
 static struct desktop_window windows[DESKTOP_WINDOWS];
 static uint32_t active_workspace,pointer_x,pointer_y,focused_window;
+static size_t selected_file;
 static uint8_t workspace_layout[DESKTOP_WORKSPACES];
 static int32_t workspace_scroll[DESKTOP_WORKSPACES];
 static int dragging=-1;
@@ -148,13 +150,29 @@ static void draw_window(uint32_t index) {
         size_t count=bread_file_count();
         if (!count) text(tx,ty,"No files on this volume.",theme->foreground,theme->background);
         else {
-            size_t limit=count<10u?count:10u;
+            size_t limit=count<8u?count:8u;
             for(size_t i=0;i<limit && ty+16u<w->y+w->height-8u;i++) {
                 const char *name=bread_file_name(i);
-                if(name) text(tx,ty,name,theme->foreground,theme->background);
-                ty+=18u;
+                if(name) text(tx,ty+24u+(uint32_t)i*18u,name,
+                              i==selected_file?theme->accent:theme->foreground,theme->background);
             }
-            if(count>limit) text(tx,ty,"More files exist; use ls in Shell.",theme->foreground,theme->background);
+            if(selected_file<count) {
+                const char *name=bread_file_name(selected_file);
+                char content[256];
+                if(name) text(tx+160u,ty+24u,name,theme->accent,theme->background);
+                if(name && bread_file_read(name,content,sizeof(content))>=0) {
+                    size_t pos=0;uint32_t line_y=ty+44u;
+                    for(uint32_t row=0;row<10u && content[pos] && line_y<w->y+w->height-8u;row++) {
+                        char line[25];size_t length=0;
+                        while(content[pos] && content[pos]!='\n' && length<24u)
+                            line[length++]=content[pos++];
+                        if(content[pos]=='\n') pos++;
+                        line[length]=0;
+                        text(tx+160u,line_y,line,theme->foreground,theme->background);
+                        line_y+=18u;
+                    }
+                }
+            }
         }
     } else if (w->app==APP_APPEARANCE) {
         text(tx,ty,"SELECT A COLOR THEME",theme->accent,theme->background);
@@ -315,6 +333,9 @@ static void mouse_event(const struct mouse_event *event) {
                     else if(workspace_layout[active_workspace]==LAYOUT_FLOAT) {
                         dragging=i;drag_x=(int32_t)pointer_x-(int32_t)view.x;drag_y=(int32_t)pointer_y-(int32_t)view.y;
                     }
+                } else if(w->app==APP_FILES && pointer_y>=view.y+58u && pointer_x<view.x+156u) {
+                    uint32_t row=(pointer_y-(view.y+58u))/18u;
+                    if(row<bread_file_count() && row<8u) selected_file=row;
                 } else if(w->app==APP_CLIPBOARD && pointer_y>=view.y+80u) {
                     uint32_t row=(pointer_y-(view.y+80u))/18u;
                     if(row<clipboard_history_count() && row<6u) clipboard_restore(row);
@@ -352,7 +373,7 @@ int desktop_run(void) {
     screen_width=video_width();screen_height=video_height();
     if(screen_width<320u || screen_height<240u) return -1;
     for(uint32_t i=0;i<DESKTOP_WINDOWS;i++) windows[i].open=0;
-    active_workspace=0;focused_window=DESKTOP_WINDOWS;dragging=-1;previous_buttons=0;
+    active_workspace=0;focused_window=DESKTOP_WINDOWS;dragging=-1;previous_buttons=0;selected_file=0;
     for(uint32_t i=0;i<DESKTOP_WORKSPACES;i++){workspace_layout[i]=LAYOUT_DWINDLE;workspace_scroll[i]=0;}
     pointer_x=screen_width/2u;pointer_y=screen_height/2u;
     open_app(APP_SHELL);

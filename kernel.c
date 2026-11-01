@@ -77,6 +77,7 @@ static int file_rmdir(const char *path){return pfs_ready()?pfs_rmdir(path):fs_rm
 static int file_move(const char *source,const char *destination){return pfs_ready()?pfs_move(source,destination):fs_move(source,destination);}
 size_t bread_file_count(void){return file_count();}
 const char *bread_file_name(size_t index){return file_name(index);}
+int bread_file_read(const char *name,char *out,size_t capacity){return file_read(name,out,capacity);}
 static void command(void){
     line[n]=0;
     if(n){uint32_t slot=history_head;for(size_t i=0;i<n && i<sizeof(command_history[slot])-1u;i++)command_history[slot][i]=line[i];command_history[slot][n<sizeof(command_history[slot])?n:sizeof(command_history[slot])-1u]=0;history_head=(history_head+1u)%HISTORY_CAPACITY;if(history_count<HISTORY_CAPACITY)history_count++;}
