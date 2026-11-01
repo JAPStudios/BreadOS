@@ -32,7 +32,8 @@ static const struct shell_menu_entry entries[] = {
     {"Clipboard","clipboard copy|sensitive|paste|history|clear","Manage native clipboard contents and retained history"},
     {"Reminders","remind TICKS TEXT","Schedule a reminder using the system timer"},
     {"Reminders","reminders","List pending reminders"},
-    {"Reminders","remind clear","Clear pending reminders"}
+    {"Reminders","remind clear","Clear pending reminders"},
+    {"Desktop","idle [TICKS|off|status]","Configure the desktop screensaver idle timeout"}
 };
 
 static char lower_ascii(char value) {

@@ -18,9 +18,9 @@ BreadOS is a freestanding 32-bit x86 operating system with its own kernel and na
 
 ## Shell commands
 
-`help`, `menu [SEARCH]`, `history`, `theme [NAME]`, `desktop`, `notify TEXT`, `notifications`, `snooze INDEX TICKS`, `dismiss INDEX`, `dnd [on|off]`, `clipboard copy|sensitive|paste|history|clear`, `remind TICKS TEXT`, `reminders`, `remind clear`, `about`, `video`, `userdemo`, `memory`, `storage`, `uptime`, `tasks`, `ls`, `mkdir PATH`, `rmdir PATH`, `cat PATH`, `write PATH TEXT`, `mv SOURCE DEST`, `rm PATH`, `clear`, `reboot`, and `halt`.
+`help`, `menu [SEARCH]`, `history`, `theme [NAME]`, `desktop`, `notify TEXT`, `notifications`, `snooze INDEX TICKS`, `dismiss INDEX`, `dnd [on|off]`, `clipboard copy|sensitive|paste|history|clear`, `remind TICKS TEXT`, `reminders`, `remind clear`, `idle [TICKS|off|status]`, `about`, `video`, `userdemo`, `memory`, `storage`, `uptime`, `tasks`, `ls`, `mkdir PATH`, `rmdir PATH`, `cat PATH`, `write PATH TEXT`, `mv SOURCE DEST`, `rm PATH`, `clear`, `reboot`, and `halt`.
 
-The `theme` command lists or applies the 23 palettes. `menu` searches the built-in command registry. `notify` creates a system notification; notification indexes are newest-first and snooze durations use PIT ticks (100 ticks = one second). `desktop` requires an RGB framebuffer of at least 320×240. Press `q` to return to the shell. Desktop shortcuts: `t` Appearance, `f` Files, `s` System, `e` Shell, `n` Notifications, `c` Clipboard, `d` toggle Do Not Disturb, `l` cycle layouts, `,`/`.` scroll the scrolling layout, `1`–`4` or `[`/`]` switch workspaces.
+The `idle` command configures the desktop screensaver timeout in PIT ticks (100 ticks = one second, default five minutes; `off` disables it). The screensaver wakes on keyboard or mouse activity and is not a security lock screen. The `theme` command lists or applies the 23 palettes. `menu` searches the built-in command registry. `notify` creates a system notification; notification indexes are newest-first and snooze durations use PIT ticks (100 ticks = one second). `desktop` requires an RGB framebuffer of at least 320×240. Press `q` to return to the shell. Desktop shortcuts: `t` Appearance, `f` Files, `s` System, `e` Shell, `n` Notifications, `c` Clipboard, `d` toggle Do Not Disturb, `l` cycle layouts, `,`/`.` scroll the scrolling layout, `1`–`4` or `[`/`]` switch workspaces.
 
 ## Build and test
 
@@ -36,7 +36,7 @@ make run
 
 ## Remaining Omarchy feature work
 
-The current desktop is kernel-rendered; its windows are not yet independent user-mode applications. The ring-3 path is a fixed smoke-test program, not a general process system. Independent address spaces, a general executable loader, IPC, process lifecycle management, a full VFS, per-monitor workspaces, multi-display management, advanced window effects, clipboard history, full settings panels, language/localization coverage, screen locking, idle management, screenshot/recording, audio, networking, Bluetooth, USB, broad hardware support, an installer, secure package management, transactional updates, snapshots, and the remaining Omarchy application/workflow features still require native implementation.
+The current desktop is kernel-rendered; its windows are not yet independent user-mode applications. The ring-3 path is a fixed smoke-test program, not a general process system. Independent address spaces, a general executable loader, IPC, process lifecycle management, a full VFS, per-monitor workspaces, multi-display management, advanced window effects, clipboard history, full settings panels, language/localization coverage, authenticated screen locking, screenshot/recording, audio, networking, Bluetooth, USB, broad hardware support, an installer, secure package management, transactional updates, snapshots, and the remaining Omarchy application/workflow features still require native implementation.
 
 ## Storage safety
 

@@ -8,6 +8,7 @@
 #include "notification.h"
 #include "clipboard.h"
 #include "reminder.h"
+#include "idle.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -368,6 +369,15 @@ static void mouse_event(const struct mouse_event *event) {
     previous_buttons=pressed;
 }
 
+static void render_screensaver(void) {
+    const struct bread_theme *theme=theme_current();
+    video_clear(theme->background);
+    video_draw_text(screen_width/2u-56u,screen_height/2u-24u,
+                    "BREADOS",theme->accent,theme->background);
+    video_draw_text(screen_width/2u-104u,screen_height/2u+4u,
+                    "Press a key or move mouse",theme->foreground,theme->background);
+}
+
 int desktop_run(void) {
     if(!video_available()) return -1;
     screen_width=video_width();screen_height=video_height();
@@ -376,15 +386,24 @@ int desktop_run(void) {
     active_workspace=0;focused_window=DESKTOP_WINDOWS;dragging=-1;previous_buttons=0;selected_file=0;
     for(uint32_t i=0;i<DESKTOP_WORKSPACES;i++){workspace_layout[i]=LAYOUT_DWINDLE;workspace_scroll[i]=0;}
     pointer_x=screen_width/2u;pointer_y=screen_height/2u;
+    idle_init(timer_ticks());
     open_app(APP_SHELL);
     open_app(APP_SYSTEM);
     render();
+    int saver_drawn=0;
     for(;;) {
-        int changed=reminder_poll(timer_ticks())?1:0;
+        uint32_t now=timer_ticks();
+        int changed=reminder_poll(now)?1:0;
         struct mouse_event event;
-        while(mouse_read_event(&event)){mouse_event(&event);changed=1;}
+        while(mouse_read_event(&event)){
+            if(idle_is_active()) {idle_activity(now);changed=1;}
+            else {idle_activity(now);mouse_event(&event);changed=1;}
+        }
         char key;
         while(keyboard_read_char(&key)) {
+            now=timer_ticks();
+            if(idle_is_active()) {idle_activity(now);changed=1;continue;}
+            idle_activity(now);
             if(key=='q' || key=='Q') return 0;
             if(key=='t' || key=='T'){open_app(APP_APPEARANCE);changed=1;}
             else if(key=='f' || key=='F'){open_app(APP_FILES);changed=1;}
@@ -400,6 +419,13 @@ int desktop_run(void) {
             else if(key=='.' && workspace_layout[active_workspace]==LAYOUT_SCROLL){uint32_t count=0;for(uint32_t i=0;i<DESKTOP_WINDOWS;i++)if(windows[i].open && windows[i].workspace==active_workspace)count++;int32_t maximum=count?(int32_t)((count-1u)*56u):0;if(workspace_scroll[active_workspace]<maximum){workspace_scroll[active_workspace]+=56;if(workspace_scroll[active_workspace]>maximum)workspace_scroll[active_workspace]=maximum;changed=1;}}
             else if(key>='1' && key<='4'){switch_workspace((uint32_t)(key-'1'));changed=1;}
         }
+        if(idle_poll(timer_ticks())) {
+            if(!saver_drawn || changed) render_screensaver();
+            saver_drawn=1;
+            __asm__ volatile("hlt");
+            continue;
+        }
+        if(saver_drawn){saver_drawn=0;changed=1;}
         if(changed) render();
         __asm__ volatile("hlt");
     }

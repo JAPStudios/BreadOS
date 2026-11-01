@@ -19,6 +19,7 @@
 #include "notification.h"
 #include "clipboard.h"
 #include "reminder.h"
+#include "idle.h"
 #define W 80
 #define H 25
 #define MB_MAGIC 0x2BADB002u
@@ -115,6 +116,24 @@ static void command(void){
             clipboard_clear();puts("Clipboard and history cleared.\n");
         } else puts("Usage: clipboard copy|sensitive|paste|history|clear [TEXT]\n");
     }
+    else if(eq(arg,"idle")) {
+        if(!*rest || eq(rest,"status")) {
+            puts("Idle timeout (PIT ticks): ");hex32(idle_timeout());puts("\n");
+        } else if(eq(rest,"off")) {
+            idle_set_timeout(0);
+            if(file_write("idle","0")>=0) puts("Screensaver disabled and setting saved.\n");
+            else puts("Screensaver disabled; setting could not be saved.\n");
+        } else {
+            uint32_t timeout=0;
+            if(!parse_u32(rest,&timeout) || timeout>3600000u)
+                puts("Usage: idle [TICKS|off|status] (100 ticks = 1 second; maximum 10 hours).\n");
+            else {
+                idle_set_timeout(timeout);
+                if(file_write("idle",rest)>=0) puts("Idle timeout saved.\n");
+                else puts("Idle timeout changed but could not be saved.\n");
+            }
+        }
+    }
     else if(eq(arg,"remind")) {
         if(eq(rest,"clear")) {reminder_clear();puts("All reminders cleared.\n");}
         else {
@@ -191,6 +210,12 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     char saved_theme[FS_DATA_MAX+1u];
     if(file_read("theme",saved_theme,sizeof(saved_theme))>=0){size_t i=0;while(saved_theme[i] && saved_theme[i]!='\n' && saved_theme[i]!='\r')i++;saved_theme[i]=0;if(theme_apply(saved_theme)<0)theme_apply("nord");}
     else theme_apply("nord");
+    char saved_idle[16];
+    if(file_read("idle",saved_idle,sizeof(saved_idle))>=0) {
+        uint32_t timeout=0;
+        if(eq(saved_idle,"0") || eq(saved_idle,"off")) idle_set_timeout(0);
+        else if(parse_u32(saved_idle,&timeout) && timeout<=3600000u) idle_set_timeout(timeout);
+    }
     clear();
     puts("Type help for commands.\n");interrupts_init();
     while(task_switch_count()<6u){__asm__ volatile("hlt");}
