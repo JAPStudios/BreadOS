@@ -20,6 +20,7 @@
 #include "clipboard.h"
 #include "reminder.h"
 #include "idle.h"
+#include "privacy.h"
 #define W 80
 #define H 25
 #define MB_MAGIC 0x2BADB002u
@@ -89,7 +90,7 @@ static void command(void){
     while(*end && *end!=' ')++end;
     char *rest=end;
     if(*end){*end++=0;while(*end==' ')++end;rest=end;}else rest=end;
-    if(eq(arg,"help"))puts("Commands: help, menu [SEARCH], history, theme [NAME], desktop, notify TEXT, notifications, snooze INDEX TICKS, dismiss INDEX, dnd [on|off], clipboard, remind TICKS TEXT, reminders, about, video, userdemo, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
+    if(eq(arg,"help"))puts("Commands: help, menu [SEARCH], history, theme [NAME], desktop, notify TEXT, notifications, snooze INDEX TICKS, dismiss INDEX, dnd [on|off], clipboard, remind TICKS TEXT, reminders, privacy [list|CAPABILITY on|off], about, video, userdemo, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
     else if(eq(arg,"menu")){size_t shown=0;puts("BreadOS command palette\n");for(size_t i=0;i<shell_menu_count();i++){const struct shell_menu_entry *entry=shell_menu_at(i);if(shell_menu_matches(entry,rest)){puts("[");puts(entry->category);puts("] ");puts(entry->command);puts(" - ");puts(entry->description);puts("\n");shown++;}}if(!shown)puts("No matching commands.\n");}
     else if(eq(arg,"history")){uint32_t start=(history_head+HISTORY_CAPACITY-history_count)%HISTORY_CAPACITY;for(uint32_t i=0;i<history_count;i++){uint32_t slot=(start+i)%HISTORY_CAPACITY;hex32(i+1u);puts("  ");puts(command_history[slot]);puts("\n");}}
     else if(eq(arg,"theme")){if(!*rest){puts("Current theme: ");puts(theme_current()->name);puts("\nAvailable themes: ");for(size_t i=0;i<theme_count();i++){if(i)puts(", ");puts(theme_at(i)->name);}puts("\n");}else if(theme_apply(rest)==0){clear();if(file_write("theme",theme_current()->name)>=0){puts("Theme applied and saved: ");puts(theme_current()->name);puts("\n");}else puts("Theme applied, but could not be saved to storage.\n");}else puts("Unknown theme. Run theme to list available themes.\n");}
@@ -173,6 +174,31 @@ static void command(void){
         else puts("Notification dismissed.\n");
     }
     else if(eq(arg,"dnd")){if(!*rest)notification_set_dnd(!notification_dnd());else if(eq(rest,"on"))notification_set_dnd(1);else if(eq(rest,"off"))notification_set_dnd(0);else puts("Usage: dnd [on|off]\n");if(!*rest||eq(rest,"on")||eq(rest,"off"))puts(notification_dnd()?"Do Not Disturb enabled.\n":"Do Not Disturb disabled.\n");}
+    else if(eq(arg,"privacy")) {
+        if(!*rest || eq(rest,"list")) {
+            puts("BreadOS privacy permission policy (all permissions default to denied):\n");
+            for(unsigned i=0;i<BREAD_PRIVACY_CAPABILITY_COUNT;i++) {
+                enum bread_privacy_capability cap=(enum bread_privacy_capability)i;
+                puts("  ");puts(privacy_name(cap));puts(": ");
+                puts(privacy_allows(cap)?"allowed\n":"denied\n");
+            }
+        } else {
+            char *mode=rest;
+            while(*rest && *rest!=' ')rest++;
+            if(*rest){*rest++=0;while(*rest==' ')rest++;}
+            enum bread_privacy_capability cap;
+            if(privacy_find(mode,&cap)<0 || (!eq(rest,"on") && !eq(rest,"off"))) {
+                puts("Usage: privacy [list|CAPABILITY on|off]\nCapabilities: camera, microphone, location, network, bluetooth, usb, sensors\n");
+            } else if(privacy_set(cap,eq(rest,"on"))<0) {
+                puts("Privacy permission update failed.\n");
+            } else {
+                char saved[16];
+                if(privacy_serialize(saved,sizeof(saved))>=0 && file_write("privacy",saved)>=0)
+                    puts("Privacy permission saved.\n");
+                else puts("Privacy permission changed in memory; persistence failed.\n");
+            }
+        }
+    }
     else if(eq(arg,"about"))puts("BreadOS: freestanding 32-bit x86 kernel; Multiboot v1 boot.\n");
     else if(eq(arg,"video")){if(video_available()){puts("Framebuffer: ");hex32(video_width());puts(" x ");hex32(video_height());puts(" RGB\n");}else puts("No supported RGB framebuffer; VGA text console remains active.\n");}
     else if(eq(arg,"userdemo")){int result=process_run_user_demo();if(result==0)puts("Ring-3 process exited successfully.\n");else puts("Ring-3 process failed.\n");}
@@ -210,6 +236,10 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     char saved_theme[FS_DATA_MAX+1u];
     if(file_read("theme",saved_theme,sizeof(saved_theme))>=0){size_t i=0;while(saved_theme[i] && saved_theme[i]!='\n' && saved_theme[i]!='\r')i++;saved_theme[i]=0;if(theme_apply(saved_theme)<0)theme_apply("nord");}
     else theme_apply("nord");
+    privacy_init();
+    char saved_privacy[16];
+    if(file_read("privacy",saved_privacy,sizeof(saved_privacy))>=0)
+        (void)privacy_deserialize(saved_privacy);
     char saved_idle[16];
     if(file_read("idle",saved_idle,sizeof(saved_idle))>=0) {
         uint32_t timeout=0;

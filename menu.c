@@ -33,7 +33,9 @@ static const struct shell_menu_entry entries[] = {
     {"Reminders","remind TICKS TEXT","Schedule a reminder using the system timer"},
     {"Reminders","reminders","List pending reminders"},
     {"Reminders","remind clear","Clear pending reminders"},
-    {"Desktop","idle [TICKS|off|status]","Configure the desktop screensaver idle timeout"}
+    {"Desktop","idle [TICKS|off|status]","Configure the desktop screensaver idle timeout"},
+    {"Privacy","privacy","List native device permission policy; permissions default to denied"},
+    {"Privacy","privacy CAPABILITY on|off","Change and persist a device permission policy"}
 };
 
 static char lower_ascii(char value) {
