@@ -182,7 +182,7 @@ void video_draw_text(uint32_t x,uint32_t y,const char *text,
     uint32_t origin_x=x;
     uint8_t rows[7];
     while (*text) {
-        if (*text=='\\n') {
+        if (*text=='\n') {
             x=origin_x;
             y+=CELL_HEIGHT;
             text++;
