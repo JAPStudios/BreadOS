@@ -52,10 +52,13 @@ irq0:
     pushl $0
     pushl $32
     jmp isr_common
+.global irq1
+irq1:
+    pushl $0
+    pushl $33
+    jmp isr_common
 isr_common:
     pusha
-    /* C ABI: interrupt_handler(vector, error_code, saved_frame).
-       The returned pointer selects the stack restored by popa/iret. */
     movl %esp, %eax
     pushl %eax
     pushl 40(%esp)

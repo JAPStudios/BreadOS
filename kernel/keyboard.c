@@ -1,15 +1,23 @@
 #include "keyboard.h"
 #include <stdint.h>
 
+#define KEY_QUEUE_SIZE 64u
+#define KEY_QUEUE_MASK (KEY_QUEUE_SIZE - 1u)
+
 static inline uint8_t inb(uint16_t port) {
     uint8_t value;
     __asm__ volatile ("inb %1, %0" : "=a"(value) : "Nd"(port));
     return value;
 }
-
+static inline void outb(uint16_t port, uint8_t value) {
+    __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
+}
 static int shift_down;
 static int caps_lock;
 static int extended_scancode;
+static int irq_enabled;
+static volatile uint8_t queue_head, queue_tail;
+static char input_queue[KEY_QUEUE_SIZE];
 
 static const uint8_t keymap[128] = {
     [0x02]=49,[0x03]=50,[0x04]=51,[0x05]=52,[0x06]=53,[0x07]=54,
@@ -34,6 +42,30 @@ static const uint8_t shifted_keymap[128] = {
     [0x31]=78,[0x32]=77
 };
 
+static int wait_input_empty(void) {
+    for (uint32_t i=0;i<100000u;i++) if (!(inb(0x64u)&2u)) return 1;
+    return 0;
+}
+static int wait_output_full(void) {
+    for (uint32_t i=0;i<100000u;i++) if (inb(0x64u)&1u) return 1;
+    return 0;
+}
+
+int keyboard_init(void) {
+    irq_enabled=0;
+    if (!wait_input_empty()) return -1;
+    outb(0x64u,0x20u);
+    if (!wait_output_full()) return -1;
+    uint8_t config=inb(0x60u);
+    config=(uint8_t)((config|1u)&~0x10u);
+    if (!wait_input_empty()) return -1;
+    outb(0x64u,0x60u);
+    if (!wait_input_empty()) return -1;
+    outb(0x60u,config);
+    irq_enabled=1;
+    return 0;
+}
+
 int keyboard_process_scancode(uint8_t scancode, char *out) {
     if (!out) return 0;
     if (scancode == 0xE0u || scancode == 0xE1u) {
@@ -44,7 +76,6 @@ int keyboard_process_scancode(uint8_t scancode, char *out) {
         extended_scancode = 0;
         return 0;
     }
-
     uint8_t key = (uint8_t)(scancode & 0x7Fu);
     int released = (scancode & 0x80u) != 0;
     if (key == 0x2Au || key == 0x36u) {
@@ -56,7 +87,6 @@ int keyboard_process_scancode(uint8_t scancode, char *out) {
         return 0;
     }
     if (released) return 0;
-
     uint8_t normal = keymap[key];
     uint8_t shifted = shifted_keymap[key];
     if (normal >= 'a' && normal <= 'z') {
@@ -73,7 +103,25 @@ int keyboard_process_scancode(uint8_t scancode, char *out) {
     return 1;
 }
 
+void keyboard_queue_scancode(uint8_t scancode) {
+    char character;
+    if (!keyboard_process_scancode(scancode,&character)) return;
+    uint8_t next=(uint8_t)((queue_head+1u)&KEY_QUEUE_MASK);
+    if (next==queue_tail) return;
+    input_queue[queue_head]=character;
+    queue_head=next;
+}
+
+void keyboard_irq_handler(void) {
+    if (inb(0x64u)&1u) keyboard_queue_scancode(inb(0x60u));
+}
+
 int keyboard_read_char(char *out) {
-    if (!out || !(inb(0x64) & 1u)) return 0;
-    return keyboard_process_scancode(inb(0x60), out);
+    if (!out) return 0;
+    if (queue_tail==queue_head && !irq_enabled && (inb(0x64u)&1u))
+        keyboard_queue_scancode(inb(0x60u));
+    if (queue_tail==queue_head) return 0;
+    *out=input_queue[queue_tail];
+    queue_tail=(uint8_t)((queue_tail+1u)&KEY_QUEUE_MASK);
+    return 1;
 }

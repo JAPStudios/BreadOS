@@ -14,22 +14,27 @@ static void expect_no_char(unsigned code) {
 
 int main(void) {
     expect_char(0x1E, 'a');
-    expect_no_char(0xAA);         /* left shift release must not stick */
-    expect_no_char(0x2A);         /* left shift down */
+    expect_no_char(0xAA);
+    expect_no_char(0x2A);
     expect_char(0x1E, 'A');
-    expect_no_char(0x9E);         /* a release */
-    expect_no_char(0xAA);         /* left shift up */
-    expect_no_char(0x2A);         /* shift down again */
-    expect_char(0x02, '!');       /* shifted number-row punctuation */
-    expect_no_char(0xAA);         /* shift up */
-    expect_no_char(0x3A);         /* Caps Lock on */
+    expect_no_char(0x9E);
+    expect_no_char(0xAA);
+    expect_no_char(0x2A);
+    expect_char(0x02, '!');
+    expect_no_char(0xAA);
+    expect_no_char(0x3A);
     expect_char(0x1E, 'A');
-    expect_no_char(0xBA);         /* Caps Lock release does not toggle */
+    expect_no_char(0xBA);
     expect_char(0x1E, 'A');
-    expect_no_char(0x3A);         /* Caps Lock off */
+    expect_no_char(0x3A);
     expect_char(0x1E, 'a');
-    expect_no_char(0xE0);         /* extended key prefix */
-    expect_no_char(0x48);         /* extended arrow is ignored */
+    expect_no_char(0xE0);
+    expect_no_char(0x48);
+
+    keyboard_queue_scancode(0x1E);
+    keyboard_queue_scancode(0x30);
+    assert(keyboard_read_char(&output)==1 && output=='a');
+    assert(keyboard_read_char(&output)==1 && output=='b');
     puts("Keyboard host regression tests passed.");
     return 0;
 }

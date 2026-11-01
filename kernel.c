@@ -90,6 +90,7 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     if(video_init(mbi)==0){video_console_clear(0x101820u,0xE6E6E6u);puts("GRUB RGB framebuffer mapped; native graphical text console initialized.\n");}else puts("No supported GRUB RGB framebuffer; VGA text fallback active.\n");
     int storage=pfs_init();if(storage==2)puts("Persistent BreadFS formatted and mounted.\n");else if(storage==1)puts("Persistent BreadFS mounted.\n");else{fs_init();if(storage==0)puts("RAM filesystem initialized (no usable ATA volume).\n");else puts("RAM filesystem initialized (ATA volume not recognized; disk left unchanged).\n");}
     tasking_init();puts("Round-robin kernel scheduler initialized (3 kernel threads).\n");
+    if(keyboard_init()==0)puts("PS/2 keyboard IRQ1 configured.\n");else puts("PS/2 keyboard IRQ1 unavailable; polling fallback enabled.\n");
     puts("Type help for commands.\n");interrupts_init();
     while(task_switch_count()<6u){__asm__ volatile("hlt");}
     puts("Scheduler smoke test passed: round-robin task switching verified.\n");prompt();
