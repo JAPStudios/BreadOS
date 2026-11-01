@@ -48,6 +48,83 @@ static int32_t drag_x,drag_y;
 static uint8_t previous_buttons;
 static uint32_t screen_width,screen_height;
 
+/* Native telemetry history for the live system HUD. Values are scheduler
+ * context switches per second, not a fabricated CPU-utilization estimate. */
+#define METRIC_HISTORY 32u
+static uint32_t metric_history[METRIC_HISTORY];
+static uint32_t metric_history_head;
+static uint32_t metric_last_tick;
+static uint32_t metric_last_switches;
+static uint32_t metric_switches_per_second;
+
+static void system_metrics_update(uint32_t now) {
+    uint32_t switches=task_switch_count();
+    if(!metric_last_tick) {
+        metric_last_tick=now;
+        metric_last_switches=switches;
+        return;
+    }
+    uint32_t elapsed=now-metric_last_tick;
+    if(elapsed<100u) return;
+    uint32_t delta=switches-metric_last_switches;
+    metric_switches_per_second=(uint32_t)(((uint64_t)delta*100u)/elapsed);
+    metric_history[metric_history_head]=metric_switches_per_second;
+    metric_history_head=(metric_history_head+1u)%METRIC_HISTORY;
+    metric_last_tick=now;
+    metric_last_switches=switches;
+}
+
+static void draw_system_metrics(uint32_t x,uint32_t y,uint32_t width,
+                                uint32_t height,const struct bread_theme *theme) {
+    char value[11];
+    uint32_t seconds=timer_ticks()/100u;
+    uint32_t hours=seconds/3600u;
+    uint32_t minutes=(seconds/60u)%60u;
+    seconds%=60u;
+    text(x,y,"LIVE SYSTEM TELEMETRY",theme->accent,theme->background);
+    y+=24u;
+    text(x,y,"Uptime:",theme->foreground,theme->background);
+    decimal(hours,value);text(x+72u,y,value,theme->foreground,theme->background);
+    text(x+96u,y,":",theme->foreground,theme->background);
+    decimal(minutes,value);
+    if(minutes<10u) { value[1]=value[0];value[0]='0';value[2]=0; }
+    text(x+104u,y,value,theme->foreground,theme->background);
+    text(x+128u,y,":",theme->foreground,theme->background);
+    decimal(seconds,value);
+    if(seconds<10u) { value[1]=value[0];value[0]='0';value[2]=0; }
+    text(x+136u,y,value,theme->foreground,theme->background);
+    y+=22u;
+    text(x,y,"Scheduler switches/sec:",theme->foreground,theme->background);
+    decimal(metric_switches_per_second,value);
+    text(x+200u,y,value,theme->accent,theme->background);
+    y+=22u;
+    text(x,y,"Free physical frames:",theme->foreground,theme->background);
+    decimal(memory_free_frames(),value);
+    text(x+176u,y,value,theme->accent,theme->background);
+    y+=28u;
+    text(x,y,"SCHEDULER ACTIVITY / LAST 32 SAMPLES",theme->accent,theme->background);
+    y+=20u;
+    uint32_t graph_width=width>16u?width-16u:width;
+    uint32_t graph_height=height>y?height-y:0u;
+    if(graph_height>48u) graph_height=48u;
+    if(graph_width>0u && graph_height>0u) {
+        video_fill_rect(x,y,graph_width,graph_height,0x202936u);
+        uint32_t bar_width=graph_width/METRIC_HISTORY;
+        if(!bar_width) bar_width=1u;
+        for(uint32_t i=0;i<METRIC_HISTORY;i++) {
+            uint32_t sample=metric_history[(metric_history_head+i)%METRIC_HISTORY];
+            uint32_t bar_height=sample>200u?graph_height:(sample*graph_height)/200u;
+            if(sample && !bar_height) bar_height=1u;
+            uint32_t bx=x+i*bar_width;
+            if(bx>=x+graph_width) break;
+            if(bar_width>1u) video_fill_rect(bx,y,bar_width-1u,graph_height,0x202936u);
+            if(bar_height) video_fill_rect(bx,y+graph_height-bar_height,
+                                           bar_width>1u?bar_width-1u:1u,
+                                           bar_height,theme->accent);
+        }
+    }
+}
+
 static const char *app_title(uint8_t app) {
     switch(app) {
         case APP_FILES:return "Files";
@@ -143,14 +220,8 @@ static void draw_window(uint32_t index) {
     uint32_t tx=w->x+12u,ty=w->y+34u;
     if (w->app==APP_SYSTEM) {
         text(tx,ty,"BREADOS SYSTEM STATUS",theme->accent,theme->background);ty+=24u;
-        text(tx,ty,"Kernel: BreadOS native x86",theme->foreground,theme->background);ty+=20u;
-        char value[11];
-        text(tx,ty,"Free 4 KiB frames:",theme->foreground,theme->background);
-        decimal(memory_free_frames(),value);text(tx+160u,ty,value,theme->accent,theme->background);ty+=20u;
-        text(tx,ty,"Task switches:",theme->foreground,theme->background);
-        decimal(task_switch_count(),value);text(tx+160u,ty,value,theme->accent,theme->background);ty+=20u;
-        text(tx,ty,"PIT ticks:",theme->foreground,theme->background);
-        decimal(timer_ticks(),value);text(tx+160u,ty,value,theme->accent,theme->background);
+        text(tx,ty,"Kernel: BreadOS native x86",theme->foreground,theme->background);ty+=24u;
+        draw_system_metrics(tx,ty,w->width-24u,w->height-46u,theme);
     } else if (w->app==APP_FILES) {
         text(tx,ty,"BREADFS FILES",theme->accent,theme->background);ty+=24u;
         size_t count=bread_file_count();
@@ -423,6 +494,7 @@ int desktop_run(void) {
     int saver_drawn=0;
     for(;;) {
         uint32_t now=timer_ticks();
+        system_metrics_update(now);
         int changed=reminder_poll(now)?1:0;
         struct mouse_event event;
         while(mouse_read_event(&event)){
