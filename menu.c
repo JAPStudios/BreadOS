@@ -29,7 +29,10 @@ static const struct shell_menu_entry entries[] = {
     {"Notifications","dnd [on|off]","Toggle Do Not Disturb"},
     {"Notifications","snooze INDEX TICKS","Temporarily hide a retained notification"},
     {"Notifications","dismiss INDEX","Dismiss a retained notification"},
-    {"Clipboard","clipboard copy|sensitive|paste|history|clear","Manage native clipboard contents and retained history"}
+    {"Clipboard","clipboard copy|sensitive|paste|history|clear","Manage native clipboard contents and retained history"},
+    {"Reminders","remind TICKS TEXT","Schedule a reminder using the system timer"},
+    {"Reminders","reminders","List pending reminders"},
+    {"Reminders","remind clear","Clear pending reminders"}
 };
 
 static char lower_ascii(char value) {

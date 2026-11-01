@@ -7,6 +7,7 @@
 #include "kernel/mouse.h"
 #include "notification.h"
 #include "clipboard.h"
+#include "reminder.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -358,7 +359,7 @@ int desktop_run(void) {
     open_app(APP_SYSTEM);
     render();
     for(;;) {
-        int changed=0;
+        int changed=reminder_poll(timer_ticks())?1:0;
         struct mouse_event event;
         while(mouse_read_event(&event)){mouse_event(&event);changed=1;}
         char key;

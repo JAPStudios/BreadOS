@@ -17,7 +17,7 @@ BreadOS is a freestanding 32-bit x86 operating system with its own kernel and na
 
 ## Shell commands
 
-`help`, `menu [SEARCH]`, `history`, `theme [NAME]`, `desktop`, `notify TEXT`, `notifications`, `snooze INDEX TICKS`, `dismiss INDEX`, `dnd [on|off]`, `clipboard copy|sensitive|paste|history|clear`, `about`, `video`, `userdemo`, `memory`, `storage`, `uptime`, `tasks`, `ls`, `mkdir PATH`, `rmdir PATH`, `cat PATH`, `write PATH TEXT`, `mv SOURCE DEST`, `rm PATH`, `clear`, `reboot`, and `halt`.
+`help`, `menu [SEARCH]`, `history`, `theme [NAME]`, `desktop`, `notify TEXT`, `notifications`, `snooze INDEX TICKS`, `dismiss INDEX`, `dnd [on|off]`, `clipboard copy|sensitive|paste|history|clear`, `remind TICKS TEXT`, `reminders`, `remind clear`, `about`, `video`, `userdemo`, `memory`, `storage`, `uptime`, `tasks`, `ls`, `mkdir PATH`, `rmdir PATH`, `cat PATH`, `write PATH TEXT`, `mv SOURCE DEST`, `rm PATH`, `clear`, `reboot`, and `halt`.
 
 The `theme` command lists or applies the 23 palettes. `menu` searches the built-in command registry. `notify` creates a system notification; notification indexes are newest-first and snooze durations use PIT ticks (100 ticks = one second). `desktop` requires an RGB framebuffer of at least 320×240. Press `q` to return to the shell. Desktop shortcuts: `t` Appearance, `f` Files, `s` System, `e` Shell, `n` Notifications, `c` Clipboard, `d` toggle Do Not Disturb, `l` cycle layouts, `,`/`.` scroll the scrolling layout, `1`–`4` or `[`/`]` switch workspaces.
 
