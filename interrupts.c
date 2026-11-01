@@ -2,6 +2,7 @@
 #include "task.h"
 #include "video.h"
 #include "kernel/keyboard.h"
+#include "kernel/mouse.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -38,7 +39,7 @@ extern void isr16(void); extern void isr17(void); extern void isr18(void); exter
 extern void isr20(void); extern void isr21(void); extern void isr22(void); extern void isr23(void);
 extern void isr24(void); extern void isr25(void); extern void isr26(void); extern void isr27(void);
 extern void isr28(void); extern void isr29(void); extern void isr30(void); extern void isr31(void);
-extern void irq0(void); extern void irq1(void);
+extern void irq0(void); extern void irq1(void); extern void irq12(void);
 
 static inline void outb(uint16_t port, uint8_t value) {
     __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
@@ -60,7 +61,7 @@ static void pic_remap(void) {
     outb(PIC1_DATA, 0x04); outb(PIC2_DATA, 0x02);
     outb(PIC1_DATA, 0x01); outb(PIC2_DATA, 0x01);
     /* Enable only IRQ0 (PIT timer); keep every other hardware IRQ masked. */
-    outb(PIC1_DATA, 0xFC); outb(PIC2_DATA, 0xFF);
+    outb(PIC1_DATA, 0xF8); outb(PIC2_DATA, 0xEF);
 }
 void interrupts_init(void) {
     void (*const exceptions[32])(void) = {
@@ -73,6 +74,7 @@ void interrupts_init(void) {
     for (unsigned i=0;i<32;i++) set_gate(i, exceptions[i]);
     set_gate(32, irq0);
     set_gate(33, irq1);
+    set_gate(44, irq12);
     struct idt_pointer p = { (uint16_t)(sizeof(idt)-1), (uint32_t)(uintptr_t)idt };
     pic_remap();
     lidt(&p);
@@ -126,6 +128,12 @@ uint32_t *interrupt_handler(uint32_t vector, uint32_t error_code, uint32_t *fram
     }
     if (vector == 33) {
         keyboard_irq_handler();
+        outb(PIC1_COMMAND, 0x20);
+        return frame;
+    }
+    if (vector == 44) {
+        mouse_irq_handler();
+        outb(PIC2_COMMAND, 0x20);
         outb(PIC1_COMMAND, 0x20);
         return frame;
     }

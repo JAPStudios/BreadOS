@@ -33,14 +33,16 @@ $(BUILD)/task.o: task.c task.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/keyboard.o: kernel/keyboard.c kernel/keyboard.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
-$(BUILD)/kernel.o: kernel.c memory.h heap.h interrupts.h fs.h pfs.h paging.h video.h gdt.h task.h kernel/keyboard.h | $(BUILD)
+$(BUILD)/mouse.o: kernel/mouse.c kernel/mouse.h | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+$(BUILD)/kernel.o: kernel.c memory.h heap.h interrupts.h fs.h pfs.h paging.h video.h gdt.h task.h kernel/keyboard.h kernel/mouse.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/interrupts.o: interrupts.s | $(BUILD)
 	$(AS) --32 $< -o $@
-$(BUILD)/interrupts_c.o: interrupts.c interrupts.h task.h video.h kernel/keyboard.h | $(BUILD)
+$(BUILD)/interrupts_c.o: interrupts.c interrupts.h task.h video.h kernel/keyboard.h kernel/mouse.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
-$(BUILD)/kernel.elf: $(BUILD)/boot.o $(BUILD)/gdt.o $(BUILD)/gdt_load.o $(BUILD)/kernel.o $(BUILD)/keyboard.o $(BUILD)/memory.o $(BUILD)/heap.o $(BUILD)/fs.o $(BUILD)/ata.o $(BUILD)/pfs.o $(BUILD)/paging.o $(BUILD)/video.o $(BUILD)/task.o $(BUILD)/interrupts.o $(BUILD)/interrupts_c.o linker.ld
-	$(LD) $(LDFLAGS) -o $@ $(BUILD)/boot.o $(BUILD)/gdt.o $(BUILD)/gdt_load.o $(BUILD)/interrupts.o $(BUILD)/interrupts_c.o $(BUILD)/memory.o $(BUILD)/heap.o $(BUILD)/fs.o $(BUILD)/ata.o $(BUILD)/pfs.o $(BUILD)/paging.o $(BUILD)/video.o $(BUILD)/task.o $(BUILD)/keyboard.o $(BUILD)/kernel.o
+$(BUILD)/kernel.elf: $(BUILD)/boot.o $(BUILD)/gdt.o $(BUILD)/gdt_load.o $(BUILD)/kernel.o $(BUILD)/keyboard.o $(BUILD)/mouse.o $(BUILD)/memory.o $(BUILD)/heap.o $(BUILD)/fs.o $(BUILD)/ata.o $(BUILD)/pfs.o $(BUILD)/paging.o $(BUILD)/video.o $(BUILD)/task.o $(BUILD)/interrupts.o $(BUILD)/interrupts_c.o linker.ld
+	$(LD) $(LDFLAGS) -o $@ $(BUILD)/boot.o $(BUILD)/gdt.o $(BUILD)/gdt_load.o $(BUILD)/interrupts.o $(BUILD)/interrupts_c.o $(BUILD)/memory.o $(BUILD)/heap.o $(BUILD)/fs.o $(BUILD)/ata.o $(BUILD)/pfs.o $(BUILD)/paging.o $(BUILD)/video.o $(BUILD)/task.o $(BUILD)/keyboard.o $(BUILD)/mouse.o $(BUILD)/kernel.o
 	grub-file --is-x86-multiboot $@
 $(BUILD)/breados.iso: $(BUILD)/kernel.elf grub.cfg
 	mkdir -p $(BUILD)/iso/boot/grub
@@ -53,17 +55,20 @@ $(BUILD)/keyboard-host-test: tests/keyboard-host.c kernel/keyboard.c kernel/keyb
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/keyboard-host.c kernel/keyboard.c -o $@
 $(BUILD)/task-host-test: tests/task-host.c task.c task.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/task-host.c task.c -o $@
+$(BUILD)/mouse-host-test: tests/mouse-host.c kernel/mouse.c kernel/mouse.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/mouse-host.c kernel/mouse.c -o $@
 $(BUILD)/video-host-test: tests/video-host.c video.c video.h paging.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/video-host.c video.c -o $@
 iso: $(BUILD)/breados.iso
 run: iso
 	test -f $(BUILD)/breados-disk.img || truncate -s 16M $(BUILD)/breados-disk.img
 	qemu-system-i386 -drive file=$(BUILD)/breados-disk.img,format=raw,if=ide,index=0 -cdrom $(BUILD)/breados.iso -serial stdio
-test: iso $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/video-host-test
+test: iso $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test
 	$(BUILD)/filesystem-host-test
 	$(BUILD)/keyboard-host-test
 	$(BUILD)/task-host-test
 	$(BUILD)/video-host-test
+	$(BUILD)/mouse-host-test
 	bash tests/boot-smoke.sh
 clean:
 	rm -rf $(BUILD)

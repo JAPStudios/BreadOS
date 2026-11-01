@@ -57,6 +57,11 @@ irq1:
     pushl $0
     pushl $33
     jmp isr_common
+.global irq12
+irq12:
+    pushl $0
+    pushl $44
+    jmp isr_common
 isr_common:
     pusha
     movl %esp, %eax

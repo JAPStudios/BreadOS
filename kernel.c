@@ -10,6 +10,7 @@
 #include "gdt.h"
 #include "task.h"
 #include "kernel/keyboard.h"
+#include "kernel/mouse.h"
 #define W 80
 #define H 25
 #define MB_MAGIC 0x2BADB002u
@@ -91,6 +92,7 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     int storage=pfs_init();if(storage==2)puts("Persistent BreadFS formatted and mounted.\n");else if(storage==1)puts("Persistent BreadFS mounted.\n");else{fs_init();if(storage==0)puts("RAM filesystem initialized (no usable ATA volume).\n");else puts("RAM filesystem initialized (ATA volume not recognized; disk left unchanged).\n");}
     tasking_init();puts("Round-robin kernel scheduler initialized (3 kernel threads).\n");
     if(keyboard_init()==0)puts("PS/2 keyboard IRQ1 configured.\n");else puts("PS/2 keyboard IRQ1 unavailable; polling fallback enabled.\n");
+    if(mouse_init(video_available()?video_width():640u,video_available()?video_height():480u)==0)puts("PS/2 mouse IRQ12 configured.\n");else puts("PS/2 mouse unavailable.\n");
     puts("Type help for commands.\n");interrupts_init();
     while(task_switch_count()<6u){__asm__ volatile("hlt");}
     puts("Scheduler smoke test passed: round-robin task switching verified.\n");prompt();
