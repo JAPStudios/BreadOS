@@ -176,11 +176,11 @@ static void command(void){
     else if(eq(arg,"dnd")){if(!*rest)notification_set_dnd(!notification_dnd());else if(eq(rest,"on"))notification_set_dnd(1);else if(eq(rest,"off"))notification_set_dnd(0);else puts("Usage: dnd [on|off]\n");if(!*rest||eq(rest,"on")||eq(rest,"off"))puts(notification_dnd()?"Do Not Disturb enabled.\n":"Do Not Disturb disabled.\n");}
     else if(eq(arg,"privacy")) {
         if(!*rest || eq(rest,"list")) {
-            puts("BreadOS privacy permission policy (all permissions default to denied):\\n");
+            puts("BreadOS privacy permission policy (all permissions default to denied):\n");
             for(unsigned i=0;i<BREAD_PRIVACY_CAPABILITY_COUNT;i++) {
                 enum bread_privacy_capability cap=(enum bread_privacy_capability)i;
                 puts("  ");puts(privacy_name(cap));puts(": ");
-                puts(privacy_allows(cap)?"allowed\\n":"denied\\n");
+                puts(privacy_allows(cap)?"allowed\n":"denied\n");
             }
         } else {
             char *mode=rest;
@@ -188,14 +188,14 @@ static void command(void){
             if(*rest){*rest++=0;while(*rest==' ')rest++;}
             enum bread_privacy_capability cap;
             if(privacy_find(mode,&cap)<0 || (!eq(rest,"on") && !eq(rest,"off"))) {
-                puts("Usage: privacy [list|CAPABILITY on|off]\\nCapabilities: camera, microphone, location, network, bluetooth, usb, sensors\\n");
+                puts("Usage: privacy [list|CAPABILITY on|off]\nCapabilities: camera, microphone, location, network, bluetooth, usb, sensors\n");
             } else if(privacy_set(cap,eq(rest,"on"))<0) {
-                puts("Privacy permission update failed.\\n");
+                puts("Privacy permission update failed.\n");
             } else {
                 char saved[16];
                 if(privacy_serialize(saved,sizeof(saved))>=0 && file_write("privacy",saved)>=0)
-                    puts("Privacy permission saved.\\n");
-                else puts("Privacy permission changed in memory; persistence failed.\\n");
+                    puts("Privacy permission saved.\n");
+                else puts("Privacy permission changed in memory; persistence failed.\n");
             }
         }
     }
