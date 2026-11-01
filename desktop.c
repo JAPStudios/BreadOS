@@ -237,6 +237,7 @@ static void draw_window(uint32_t index) {
         text(tx,ty,", / .  Scroll layout",theme->foreground,theme->background);ty+=18u;
         text(tx,ty,"N  Notifications  C  Clipboard",theme->foreground,theme->background);ty+=18u;
         text(tx,ty,"D  Do Not Disturb",theme->foreground,theme->background);ty+=18u;
+        text(tx,ty,"Space  Search applications",theme->foreground,theme->background);ty+=18u;
         text(tx,ty,"Q  Return to kernel console",theme->foreground,theme->background);
     }
 }

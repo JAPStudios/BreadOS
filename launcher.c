@@ -1,31 +1,73 @@
 #include "launcher.h"
+
 static const struct bread_launcher_entry entries[] = {
- {"Shell","System","Kernel command interface",0},
- {"Files","System","Browse BreadFS files",1},
- {"Appearance","Personalization","Choose desktop color theme",2},
- {"System","System","View kernel and memory status",3},
- {"Notifications","System","Review alerts and notification history",4},
- {"Clipboard","Productivity","Browse and restore clipboard history",5}
+    {"Shell", "System", "Kernel command interface", 0},
+    {"Files", "System", "Browse BreadFS files", 1},
+    {"Appearance", "Personalization", "Choose desktop color theme", 2},
+    {"System", "System", "View kernel and memory status", 3},
+    {"Notifications", "System", "Review alerts and notification history", 4},
+    {"Clipboard", "Productivity", "Browse and restore clipboard history", 5}
 };
-static char fold(char c){return c>='A'&&c<='Z'?(char)(c-'A'+'a'):c;}
-static int score_text(const char *s,const char *q){
- if(!q||!*q)return 0;int score=0,first=1;size_t pos=0;
- for(;*q;q++){char wanted=fold(*q);while(s[pos]&&fold(s[pos])!=wanted){pos++;score++;}
- if(!s[pos])return -1;if(first&&pos)score+=4;first=0;pos++;}return score;
+
+static char fold(char c) {
+    return c >= 'A' && c <= 'Z' ? (char)(c - 'A' + 'a') : c;
 }
-static int score_entry(const struct bread_launcher_entry *e,const char *q){
- int best=score_text(e->name,q),v=score_text(e->category,q),w=score_text(e->description,q);
- if(v>=0&&(best<0||v+3<best))best=v+3;
- if(w>=0&&(best<0||w+8<best))best=w+8;return best;
+
+static int score_text(const char *candidate, const char *query) {
+    if (!query || !*query) return 0;
+    int score = 0;
+    int first = 1;
+    size_t position = 0;
+    for (; *query; ++query) {
+        char wanted = fold(*query);
+        while (candidate[position] && fold(candidate[position]) != wanted) {
+            ++position;
+            ++score;
+        }
+        if (!candidate[position]) return -1;
+        if (first && position != 0u) score += 4;
+        first = 0;
+        ++position;
+    }
+    return score;
 }
-const struct bread_launcher_entry *bread_launcher_entry_at(size_t i){return i<6u?&entries[i]:0;}
-size_t bread_launcher_entry_count(void){return 6u;}
-size_t bread_launcher_search(const char *q,size_t *out,size_t cap){
- if(!out||!cap)return 0;size_t n=0;
- for(size_t i=0;i<6u;i++){int score=score_entry(&entries[i],q);if(score<0)continue;
- size_t at=n<cap?n:cap-1u;
- while(at){int prev=score_entry(&entries[out[at-1u]],q);if(prev<=score)break;
- if(at<cap)out[at]=out[at-1u];at--;}
- out[at]=i;if(n<cap)n++;
- }return n;
+
+static int entry_score(const struct bread_launcher_entry *entry, const char *query) {
+    int best = score_text(entry->name, query);
+    int category = score_text(entry->category, query);
+    int description = score_text(entry->description, query);
+    if (category >= 0 && (best < 0 || category + 3 < best)) best = category + 3;
+    if (description >= 0 && (best < 0 || description + 8 < best)) best = description + 8;
+    return best;
+}
+
+const struct bread_launcher_entry *bread_launcher_entry_at(size_t index) {
+    return index < sizeof(entries) / sizeof(entries[0]) ? &entries[index] : 0;
+}
+
+size_t bread_launcher_entry_count(void) {
+    return sizeof(entries) / sizeof(entries[0]);
+}
+
+size_t bread_launcher_search(const char *query, size_t *indices, size_t capacity) {
+    if (!indices || !capacity) return 0;
+    size_t count = 0;
+    for (size_t i = 0; i < bread_launcher_entry_count(); ++i) {
+        int score = entry_score(&entries[i], query);
+        if (score < 0) continue;
+        if (count == capacity) {
+            int worst = entry_score(&entries[indices[count - 1u]], query);
+            if (score >= worst) continue;
+        }
+        size_t at = count < capacity ? count : capacity - 1u;
+        while (at > 0u) {
+            int previous = entry_score(&entries[indices[at - 1u]], query);
+            if (previous <= score) break;
+            indices[at] = indices[at - 1u];
+            --at;
+        }
+        indices[at] = i;
+        if (count < capacity) ++count;
+    }
+    return count;
 }
