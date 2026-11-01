@@ -13,6 +13,8 @@
 #include "kernel/mouse.h"
 #include "process.h"
 #include "console.h"
+#include "theme.h"
+#include "menu.h"
 #define W 80
 #define H 25
 #define MB_MAGIC 0x2BADB002u
@@ -21,6 +23,9 @@ extern uint32_t timer_ticks(void);
 static volatile uint16_t *const vga=(volatile uint16_t*)0xB8000;
 static size_t row,col,n;
 static char line[128];
+#define HISTORY_CAPACITY 16u
+static char command_history[HISTORY_CAPACITY][128];
+static uint32_t history_head,history_count;
 static inline void outb(uint16_t p,uint8_t v){__asm__ volatile("outb %0,%1"::"a"(v),"Nd"(p));}
 static inline uint8_t inb(uint16_t p){uint8_t v;__asm__ volatile("inb %1,%0":"=a"(v):"Nd"(p));return v;}
 static void serial_init(void){outb(COM1+1,0);outb(COM1+3,0x80);outb(COM1,3);outb(COM1+1,0);outb(COM1+3,3);outb(COM1+2,0xC7);outb(COM1+4,0x0B);}
@@ -35,13 +40,13 @@ static void put(char c){
         if(c=='\n'){col=0;if(++row>=H)scroll();}
         else if(c=='\r'){col=0;}
         else if(c=='\b'){if(col)col--;}
-        else {vga[row*W+col]=(uint16_t)c|0x0F00;if(++col>=W){col=0;if(++row>=H)scroll();}}
+        else {const struct bread_theme *t=theme_current();uint32_t light=((t->background>>16&255u)+(t->background>>8&255u)+(t->background&255u))/3u;uint16_t attr=light>128u?0x7000u:0x0F00u;vga[row*W+col]=(uint16_t)c|attr;if(++col>=W){col=0;if(++row>=H)scroll();}}
     }
     for(unsigned i=0;i<100000;i++)if(inb(COM1+5)&0x20){outb(COM1,c);break;}
 }
 static void puts(const char*s){while(*s)put(*s++);}
 void console_put_char(char c){put(c);}
-static void clear(void){for(size_t i=0;i<W*H;i++)vga[i]=0x0F20;row=col=0;if(video_available())video_console_clear(0x101820u,0xE6E6E6u);}
+static void clear(void){const struct bread_theme *t=theme_current();uint32_t light=((t->background>>16&255u)+(t->background>>8&255u)+(t->background&255u))/3u;uint16_t attr=light>128u?0x7000u:0x0F00u;for(size_t i=0;i<W*H;i++)vga[i]=(uint16_t)' '|attr;row=col=0;if(video_available())video_console_clear(t->background,t->foreground);}
 static int eq(const char*a,const char*b){while(*a&&*b&&*a==*b){a++;b++;}return *a==*b;}
 static void hex32(uint32_t value){static const char d[]="0123456789ABCDEF";for(int s=28;s>=0;s-=4)put(d[(value>>s)&15u]);}
 static void prompt(void){puts("bread> ");}
@@ -55,6 +60,7 @@ static int file_rmdir(const char *path){return pfs_ready()?pfs_rmdir(path):fs_rm
 static int file_move(const char *source,const char *destination){return pfs_ready()?pfs_move(source,destination):fs_move(source,destination);}
 static void command(void){
     line[n]=0;
+    if(n){uint32_t slot=history_head;for(size_t i=0;i<n && i<sizeof(command_history[slot])-1u;i++)command_history[slot][i]=line[i];command_history[slot][n<sizeof(command_history[slot])?n:sizeof(command_history[slot])-1u]=0;history_head=(history_head+1u)%HISTORY_CAPACITY;if(history_count<HISTORY_CAPACITY)history_count++;}
     puts("\n");
     char *arg=line;
     while(*arg==' ')++arg;
@@ -62,7 +68,10 @@ static void command(void){
     while(*end && *end!=' ')++end;
     char *rest=end;
     if(*end){*end++=0;while(*end==' ')++end;rest=end;}else rest=end;
-    if(eq(arg,"help"))puts("Commands: help, about, video, userdemo, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
+    if(eq(arg,"help"))puts("Commands: help, menu [SEARCH], history, theme [NAME], about, video, userdemo, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
+    else if(eq(arg,"menu")){size_t shown=0;puts("BreadOS command palette\n");for(size_t i=0;i<shell_menu_count();i++){const struct shell_menu_entry *entry=shell_menu_at(i);if(shell_menu_matches(entry,rest)){puts("[");puts(entry->category);puts("] ");puts(entry->command);puts(" - ");puts(entry->description);puts("\n");shown++;}}if(!shown)puts("No matching commands.\n");}
+    else if(eq(arg,"history")){uint32_t start=(history_head+HISTORY_CAPACITY-history_count)%HISTORY_CAPACITY;for(uint32_t i=0;i<history_count;i++){uint32_t slot=(start+i)%HISTORY_CAPACITY;hex32(i+1u);puts("  ");puts(command_history[slot]);puts("\n");}}
+    else if(eq(arg,"theme")){if(!*rest){puts("Current theme: ");puts(theme_current()->name);puts("\nAvailable themes: ");for(size_t i=0;i<theme_count();i++){if(i)puts(", ");puts(theme_at(i)->name);}puts("\n");}else if(theme_apply(rest)==0){clear();if(file_write("theme",theme_current()->name)>=0){puts("Theme applied and saved: ");puts(theme_current()->name);puts("\n");}else puts("Theme applied, but could not be saved to storage.\n");}else puts("Unknown theme. Run theme to list available themes.\n");}
     else if(eq(arg,"about"))puts("BreadOS: freestanding 32-bit x86 kernel; Multiboot v1 boot.\n");
     else if(eq(arg,"video")){if(video_available()){puts("Framebuffer: ");hex32(video_width());puts(" x ");hex32(video_height());puts(" RGB\n");}else puts("No supported RGB framebuffer; VGA text console remains active.\n");}
     else if(eq(arg,"userdemo")){int result=process_run_user_demo();if(result==0)puts("Ring-3 process exited successfully.\n");else puts("Ring-3 process failed.\n");}
@@ -92,11 +101,15 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     memory_init(mbi);puts("Physical frame allocator initialized.\n");
     heap_init();puts("Kernel heap initialized (256 KiB).\n");
     paging_init();puts("Paging enabled: first 16 MiB identity-mapped.\n");
-    if(video_init(mbi)==0){video_console_clear(0x101820u,0xE6E6E6u);puts("GRUB RGB framebuffer mapped; native graphical text console initialized.\n");}else puts("No supported GRUB RGB framebuffer; VGA text fallback active.\n");
+    if(video_init(mbi)==0){theme_apply(theme_current()->name);puts("GRUB RGB framebuffer mapped; native graphical text console initialized.\n");}else puts("No supported GRUB RGB framebuffer; VGA text fallback active.\n");
     int storage=pfs_init();if(storage==2)puts("Persistent BreadFS formatted and mounted.\n");else if(storage==1)puts("Persistent BreadFS mounted.\n");else{fs_init();if(storage==0)puts("RAM filesystem initialized (no usable ATA volume).\n");else puts("RAM filesystem initialized (ATA volume not recognized; disk left unchanged).\n");}
     tasking_init();puts("Round-robin kernel scheduler initialized (3 kernel threads).\n");
     if(keyboard_init()==0)puts("PS/2 keyboard IRQ1 configured.\n");else puts("PS/2 keyboard IRQ1 unavailable; polling fallback enabled.\n");
     if(mouse_init(video_available()?video_width():640u,video_available()?video_height():480u)==0)puts("PS/2 mouse IRQ12 configured.\n");else puts("PS/2 mouse unavailable.\n");
+    char saved_theme[FS_DATA_MAX+1u];
+    if(file_read("theme",saved_theme,sizeof(saved_theme))>=0){size_t i=0;while(saved_theme[i] && saved_theme[i]!='\n' && saved_theme[i]!='\r')i++;saved_theme[i]=0;if(theme_apply(saved_theme)<0)theme_apply("nord");}
+    else theme_apply("nord");
+    clear();
     puts("Type help for commands.\n");interrupts_init();
     while(task_switch_count()<6u){__asm__ volatile("hlt");}
     puts("Scheduler smoke test passed: round-robin task switching verified.\n");

@@ -12,9 +12,10 @@ BreadOS is an experimental, freestanding 32-bit x86 operating-system kernel. It 
 - PS/2 keyboard IRQ1 character queue with polling fallback, plus PS/2 mouse IRQ12 packet decoding and bounded pointer-event queue; serial diagnostics.
 - Small RAM filesystem and fixed-sector ATA PIO-backed BreadFS v1. Both remain limited to 16 total entries, 15-character paths, and 255 bytes per file.
 - Round-robin kernel-thread scheduler with a preemptible ring-3 demonstration process, two user-mapped pages, and an `int 0x80` character-write/exit syscall path.
-- Host regression tests for filesystems, keyboard translation and input-queue behavior, mouse packet decoding, task switching, and framebuffer drawing/text; QEMU boot/persistence smoke test.
+- Native command palette with category and text search, 16-entry shell history, and 23 selectable Omarchy-derived color themes. Theme selection persists across boots on BreadFS.
+- Host regression tests for filesystems, keyboard translation and input-queue behavior, mouse packet decoding, task switching, framebuffer drawing/text, theme selection, and command-palette search; QEMU boot/persistence smoke test.
 
-The shell provides `help`, `about`, `video`, `userdemo`, `memory`, `storage`, `uptime`, `tasks`, `ls`, `mkdir PATH`, `rmdir PATH`, `cat PATH`, `write PATH TEXT`, `mv SOURCE DEST`, `rm PATH`, `clear`, `reboot`, and `halt`.
+The shell provides `help`, `menu [SEARCH]`, `history`, `theme [NAME]`, `about`, `video`, `userdemo`, `memory`, `storage`, `uptime`, `tasks`, `ls`, `mkdir PATH`, `rmdir PATH`, `cat PATH`, `write PATH TEXT`, `mv SOURCE DEST`, `rm PATH`, `clear`, `reboot`, and `halt`. `menu` searches a native command registry; `theme` lists or applies the 23 palettes and saves the selected theme in BreadFS.
 
 ## Build
 
@@ -33,11 +34,9 @@ make test
 make run
 ```
 
-## Omarchy feature port
+## Native desktop feature port
 
-The Omarchy project is being used to identify desktop, workflow, application, customization, installation, update, and quality-of-life features to reimplement natively. BreadOS must not acquire Linux, Arch, systemd, pacman, Wayland, Hyprland, Quickshell, D-Bus, or Linux userspace ABI dependencies.
-
-A native framebuffer text console and drawing foundation are implemented in `video.c` and `paging.c`. This is not yet a graphical desktop, window manager, compositor, application framework, or full Omarchy port. Those require user-mode processes, syscalls, IPC, drivers, storage, and further graphics work.
+BreadOS reimplements Omarchy's user-facing features against its own kernel and userspace. The first native ports are the searchable command palette, shell history, and persistent theme selection using all 23 upstream theme color palettes. The framebuffer console, keyboard, mouse, and ring-3 syscall foundation are also native BreadOS code. Linux, Arch, systemd, pacman, Wayland, Hyprland, Quickshell, D-Bus, and Linux userspace ABI components are not runtime dependencies. This remains an incremental implementation: the window manager, compositor, panels, notifications, application framework, installer, package/update system, networking, audio, and broad hardware support are still outstanding.
 
 ## Known limitations
 
@@ -49,6 +48,3 @@ The only ring-3 execution path is a fixed smoke-test program with two user pages
 
 BreadFS initializes a disk only when its first sector is blank. If the first sector contains an unrecognized format, the kernel leaves it unchanged and falls back to the RAM filesystem.
 
-## Third-party licensing
-
-See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Omarchy source code is MIT-licensed, but individual bundled fonts, wallpapers, icons, and other assets require separate license and provenance checks before reuse.
