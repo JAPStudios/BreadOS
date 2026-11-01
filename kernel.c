@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "interrupts.h"
+#include "audio.h"
 #include "memory.h"
 #include "heap.h"
 #include "fs.h"
@@ -90,7 +91,7 @@ static void command(void){
     while(*end && *end!=' ')++end;
     char *rest=end;
     if(*end){*end++=0;while(*end==' ')++end;rest=end;}else rest=end;
-    if(eq(arg,"help"))puts("Commands: help, menu [SEARCH], history, theme [NAME], desktop, notify TEXT, notifications, snooze INDEX TICKS, dismiss INDEX, dnd [on|off], clipboard, remind TICKS TEXT, reminders, privacy [list|CAPABILITY on|off], heapcheck, about, video, userdemo, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
+    if(eq(arg,"help"))puts("Commands: help, menu [SEARCH], history, theme [NAME], desktop, notify TEXT, notifications, snooze INDEX TICKS, dismiss INDEX, dnd [on|off], clipboard, remind TICKS TEXT, reminders, privacy [list|CAPABILITY on|off], heapcheck, beep FREQUENCY [DURATION_TICKS], about, video, userdemo, memory, storage, uptime, tasks, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
     else if(eq(arg,"menu")){size_t shown=0;puts("BreadOS command palette\n");for(size_t i=0;i<shell_menu_count();i++){const struct shell_menu_entry *entry=shell_menu_at(i);if(shell_menu_matches(entry,rest)){puts("[");puts(entry->category);puts("] ");puts(entry->command);puts(" - ");puts(entry->description);puts("\n");shown++;}}if(!shown)puts("No matching commands.\n");}
     else if(eq(arg,"history")){uint32_t start=(history_head+HISTORY_CAPACITY-history_count)%HISTORY_CAPACITY;for(uint32_t i=0;i<history_count;i++){uint32_t slot=(start+i)%HISTORY_CAPACITY;hex32(i+1u);puts("  ");puts(command_history[slot]);puts("\n");}}
     else if(eq(arg,"theme")){if(!*rest){puts("Current theme: ");puts(theme_current()->name);puts("\nAvailable themes: ");for(size_t i=0;i<theme_count();i++){if(i)puts(", ");puts(theme_at(i)->name);}puts("\n");}else if(theme_apply(rest)==0){clear();if(file_write("theme",theme_current()->name)>=0){puts("Theme applied and saved: ");puts(theme_current()->name);puts("\n");}else puts("Theme applied, but could not be saved to storage.\n");}else puts("Unknown theme. Run theme to list available themes.\n");}
@@ -199,6 +200,15 @@ static void command(void){
             }
         }
     }
+    else if(eq(arg,"beep")) {
+        char *frequency_text=rest;
+        while(*rest && *rest!=' ')rest++;
+        uint32_t frequency=0,duration=10u;
+        if(*rest){*rest++=0;while(*rest==' ')rest++;if(!parse_u32(rest,&duration))duration=0;}
+        if(!parse_u32(frequency_text,&frequency) || audio_play_tone(frequency,duration)<0)
+            puts("Usage: beep FREQUENCY [DURATION_TICKS] (20-20000 Hz; duration 1-1000 ticks).\\n");
+        else puts("PC speaker tone completed.\\n");
+    }
     else if(eq(arg,"heapcheck"))puts(heap_check_integrity()?"Kernel heap integrity: OK (block guards and live allocation canaries valid).\n":"Kernel heap integrity: FAILED (corruption detected; inspect before further allocation).\n");
     else if(eq(arg,"about"))puts("BreadOS: freestanding 32-bit x86 kernel; Multiboot v1 boot.\n");
     else if(eq(arg,"video")){if(video_available()){puts("Framebuffer: ");hex32(video_width());puts(" x ");hex32(video_height());puts(" RGB\n");}else puts("No supported RGB framebuffer; VGA text console remains active.\n");}
@@ -248,7 +258,7 @@ void kernel_main(uint32_t magic,uint32_t mbi){
         else if(parse_u32(saved_idle,&timeout) && timeout<=3600000u) idle_set_timeout(timeout);
     }
     clear();
-    puts("Type help for commands.\n");interrupts_init();
+    puts("Type help for commands.\n");interrupts_init();audio_init();
     while(task_switch_count()<6u){__asm__ volatile("hlt");}
     puts("Scheduler smoke test passed: round-robin task switching verified.\n");
     int user_result=process_run_user_demo();

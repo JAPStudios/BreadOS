@@ -5,6 +5,7 @@ static const struct shell_menu_entry entries[] = {
     {"System","video","Show framebuffer mode and graphics status"},
     {"System","memory","Show available physical memory frames"},
     {"System","heapcheck","Validate kernel heap metadata and live allocation canaries"},
+    {"Audio","beep FREQUENCY [DURATION_TICKS]","Play a tone through the PIT-driven PC speaker"},
     {"System","storage","Show active storage backend"},
     {"System","uptime","Show system timer ticks"},
     {"System","tasks","Show scheduler task-switch count"},
