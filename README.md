@@ -58,6 +58,10 @@ The paging implementation maps only the first 16 MiB. The physical frame allocat
 - `tests/boot-smoke.sh`: QEMU serial boot smoke test.
 - `.github/workflows/build.yml`: CI build and smoke test.
 
+## Omarchy feature-port reference
+
+The Omarchy project is being used as a feature and usability reference for a native BreadOS desktop. BreadOS keeps its own kernel; Linux, Arch Linux, Hyprland, Quickshell, systemd, pacman, and the Linux userspace ABI are not runtime dependencies. The extraction and native-port plan is documented in [docs/OMARCHY_NATIVE_PORT.md](docs/OMARCHY_NATIVE_PORT.md). Third-party licensing notes are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## Contributing
 
 Changes to kernel or storage behavior should be validated with a clean build and QEMU test. Treat disk images as disposable test fixtures and describe unimplemented functionality as planned work rather than an existing feature.
