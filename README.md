@@ -5,14 +5,14 @@ BreadOS is an experimental, freestanding 32-bit x86 operating-system kernel. It 
 ## Implemented kernel and system foundations
 
 - Multiboot v1 boot through GRUB, retaining the VGA text console while accepting an RGB framebuffer when the bootloader supplies one.
-- Validated Multiboot RGB framebuffer discovery and mapping into a dedicated virtual window, with clipped pixel and rectangle drawing primitives.
+- Validated Multiboot RGB framebuffer discovery and mapping into a dedicated virtual window, with a native 5×7 glyph renderer, text console, clipped pixel and rectangle drawing primitives.
 - GDT setup, TSS, IDT exception stubs, remapped PIC, and a 100 Hz PIT tick counter.
 - Physical frame bitmap initialized from the Multiboot memory map; allocation remains restricted to the first 16 MiB identity-mapped region.
 - Fixed 256 KiB kernel heap and bootstrap supervisor paging.
 - Polling PS/2 keyboard shell and serial diagnostics.
 - Small RAM filesystem and fixed-sector ATA PIO-backed BreadFS v1. Both remain limited to 16 total entries, 15-character paths, and 255 bytes per file.
 - Round-robin kernel-thread scheduler groundwork.
-- Host regression tests for filesystems, keyboard translation, task switching, and framebuffer drawing; QEMU boot/persistence smoke test.
+- Host regression tests for filesystems, keyboard translation, task switching, and framebuffer drawing/text; QEMU boot/persistence smoke test.
 
 The shell provides `help`, `about`, `video`, `memory`, `storage`, `uptime`, `tasks`, `ls`, `mkdir PATH`, `rmdir PATH`, `cat PATH`, `write PATH TEXT`, `mv SOURCE DEST`, `rm PATH`, `clear`, `reboot`, and `halt`.
 
@@ -37,11 +37,11 @@ make run
 
 The Omarchy project is being used to identify desktop, workflow, application, customization, installation, update, and quality-of-life features to reimplement natively. BreadOS must not acquire Linux, Arch, systemd, pacman, Wayland, Hyprland, Quickshell, D-Bus, or Linux userspace ABI dependencies.
 
-The first native graphics foundation is now implemented in `video.c` and `paging.c`. This is not yet a graphical desktop, window manager, compositor, application framework, or full Omarchy port. Those require user-mode processes, syscalls, IPC, drivers, storage, and further graphics work.
+A native framebuffer text console and drawing foundation are implemented in `video.c` and `paging.c`. This is not yet a graphical desktop, window manager, compositor, application framework, or full Omarchy port. Those require user-mode processes, syscalls, IPC, drivers, storage, and further graphics work.
 
 ## Known limitations
 
-No user-mode execution, syscall ABI, process isolation, complete virtual-memory manager, general VFS, USB, networking, Wi-Fi, audio, GPU acceleration, window manager, compositor, application compatibility, secure package manager, transactional updates, installer, or Android/ARM64 support is implemented. The framebuffer renderer supports 24/32-bit RGB modes only and maps at most one 4 MiB physical window. The existing shell remains VGA text-based; the framebuffer currently provides graphics primitives and a minimal boot surface, not a complete desktop.
+No user-mode execution, syscall ABI, process isolation, complete virtual-memory manager, general VFS, USB, networking, Wi-Fi, audio, GPU acceleration, window manager, compositor, application compatibility, secure package manager, transactional updates, installer, or Android/ARM64 support is implemented. The framebuffer renderer supports 24/32-bit RGB modes only and maps at most one 4 MiB physical window. The shell can render through the framebuffer text console when GRUB supplies a supported RGB mode, and falls back to VGA text otherwise. No windowed desktop exists yet.
 
 ## Disk safety
 

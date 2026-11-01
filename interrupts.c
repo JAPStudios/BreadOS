@@ -1,5 +1,6 @@
 #include "interrupts.h"
 #include "task.h"
+#include "video.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -98,9 +99,14 @@ static void serial_hex(uint32_t value) {
     for (int shift=28; shift>=0; shift-=4) serial_char(digits[(value >> shift) & 0xF]);
 }
 static void fatal_exception(uint32_t vector, uint32_t error_code) {
-    volatile uint16_t *vga=(volatile uint16_t *)0xB8000;
     const char *msg="BreadOS fatal CPU exception; halted.";
-    for (unsigned i=0;msg[i] && i<80;i++) vga[i]=(uint16_t)(uint8_t)msg[i] | 0x4F00;
+    if (video_available()) {
+        video_console_clear(0x300000u,0xFFFFFFu);
+        for (unsigned i=0;msg[i];i++) video_console_put(msg[i]);
+    } else {
+        volatile uint16_t *vga=(volatile uint16_t *)0xB8000;
+        for (unsigned i=0;msg[i] && i<80;i++) vga[i]=(uint16_t)(uint8_t)msg[i] | 0x4F00;
+    }
     serial_text("FATAL CPU exception vector=0x");
     serial_hex(vector);
     serial_text(" error=0x");
