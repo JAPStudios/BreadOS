@@ -14,6 +14,9 @@
 #define APP_FILES 1u
 #define APP_APPEARANCE 2u
 #define APP_SYSTEM 3u
+#define LAYOUT_DWINDLE 0u
+#define LAYOUT_SCROLL 1u
+#define LAYOUT_FLOAT 2u
 
 struct desktop_window {
     uint32_t x,y,width,height;
@@ -26,6 +29,8 @@ extern const char *bread_file_name(size_t index);
 
 static struct desktop_window windows[DESKTOP_WINDOWS];
 static uint32_t active_workspace,pointer_x,pointer_y,focused_window;
+static uint8_t workspace_layout[DESKTOP_WORKSPACES];
+static int32_t workspace_scroll[DESKTOP_WORKSPACES];
 static int dragging=-1;
 static int32_t drag_x,drag_y;
 static uint8_t previous_buttons;
@@ -52,8 +57,63 @@ static void decimal(uint32_t value,char output[11]) {
     output[count]=0;
 }
 
+static const char *layout_title(void) {
+    if(workspace_layout[active_workspace]==LAYOUT_SCROLL) return "SCROLL";
+    if(workspace_layout[active_workspace]==LAYOUT_FLOAT) return "FLOAT";
+    return "DWINDLE";
+}
+
+static void dwindle_rect(uint32_t rank,uint32_t count,uint32_t depth,
+                         uint32_t x,uint32_t y,uint32_t width,uint32_t height,
+                         uint32_t *out_x,uint32_t *out_y,
+                         uint32_t *out_width,uint32_t *out_height) {
+    if(count<=1u) {
+        *out_x=x;*out_y=y;*out_width=width;*out_height=height;return;
+    }
+    if((depth&1u)==0u) {
+        uint32_t first=width/2u;
+        if(rank==0u) {*out_x=x;*out_y=y;*out_width=first;*out_height=height;}
+        else dwindle_rect(rank-1u,count-1u,depth+1u,x+first,y,width-first,height,
+                          out_x,out_y,out_width,out_height);
+    } else {
+        uint32_t first=height/2u;
+        if(rank==0u) {*out_x=x;*out_y=y;*out_width=width;*out_height=first;}
+        else dwindle_rect(rank-1u,count-1u,depth+1u,x,y+first,width,height-first,
+                          out_x,out_y,out_width,out_height);
+    }
+}
+
+static void arranged_window(uint32_t index,struct desktop_window *out) {
+    *out=windows[index];
+    if(!out->open || out->workspace!=active_workspace ||
+       workspace_layout[active_workspace]==LAYOUT_FLOAT) return;
+    uint32_t rank=0,count=0;
+    for(uint32_t i=0;i<DESKTOP_WINDOWS;i++) {
+        if(windows[i].open && windows[i].workspace==active_workspace) {
+            if(i==index) rank=count;
+            count++;
+        }
+    }
+    if(!count) return;
+    uint32_t area_x=8u,area_y=34u,area_w=screen_width-16u,area_h=screen_height-84u;
+    if(workspace_layout[active_workspace]==LAYOUT_DWINDLE) {
+        dwindle_rect(rank,count,0u,area_x,area_y,area_w,area_h,
+                     &out->x,&out->y,&out->width,&out->height);
+    } else {
+        int32_t x=(int32_t)area_x+(int32_t)(rank*56u)-workspace_scroll[active_workspace];
+        out->x=x<0?0u:(uint32_t)x;
+        out->y=area_y;
+        out->width=area_w>72u?area_w-40u:area_w;
+        out->height=area_h;
+    }
+    if(out->width<120u) out->width=120u;
+    if(out->height<80u) out->height=80u;
+}
+
 static void draw_window(uint32_t index) {
-    const struct desktop_window *w=&windows[index];
+    struct desktop_window view;
+    arranged_window(index,&view);
+    const struct desktop_window *w=&view;
     if (!w->open || w->workspace!=active_workspace) return;
     const struct bread_theme *theme=theme_current();
     uint32_t border=index==focused_window?theme->accent:0x596273u;
@@ -107,6 +167,8 @@ static void draw_window(uint32_t index) {
         text(tx,ty,"T  Appearance   F  Files",theme->foreground,theme->background);ty+=18u;
         text(tx,ty,"S  System       E  Shell",theme->foreground,theme->background);ty+=18u;
         text(tx,ty,"[ / ]  Switch workspace",theme->foreground,theme->background);ty+=18u;
+        text(tx,ty,"L  Cycle layouts",theme->foreground,theme->background);ty+=18u;
+        text(tx,ty,", / .  Scroll layout",theme->foreground,theme->background);ty+=18u;
         text(tx,ty,"Q  Return to kernel console",theme->foreground,theme->background);
     }
 }
@@ -117,6 +179,7 @@ static void render(void) {
     video_fill_rect(0,0,screen_width,28u,0x171C25u);
     text(12u,6u,"BREADOS",0xFFFFFFu,0x171C25u);
     text(92u,6u,"NATIVE DESKTOP",theme->accent,0x171C25u);
+    text(224u,6u,layout_title(),theme->foreground,0x171C25u);
     for(uint32_t i=0;i<DESKTOP_WORKSPACES;i++) {
         uint32_t x=screen_width-116u+i*26u;
         uint32_t bg=i==active_workspace?theme->accent:0x343D49u;
@@ -188,25 +251,31 @@ static void mouse_event(const struct mouse_event *event) {
         } else {
             for(int32_t i=(int32_t)DESKTOP_WINDOWS-1;i>=0;i--) {
                 struct desktop_window *w=&windows[i];
+                struct desktop_window view;
+                arranged_window((uint32_t)i,&view);
                 if(!w->open || w->workspace!=active_workspace) continue;
-                if(pointer_x<w->x || pointer_x>=w->x+w->width ||
-                   pointer_y<w->y || pointer_y>=w->y+w->height) continue;
+                if(pointer_x<view.x || pointer_x>=view.x+view.width ||
+                   pointer_y<view.y || pointer_y>=view.y+view.height) continue;
                 focused_window=(uint32_t)i;
-                if(pointer_y<w->y+24u) {
-                    if(pointer_x>=w->x+w->width-24u) w->open=0;
-                    else {dragging=i;drag_x=(int32_t)pointer_x-(int32_t)w->x;drag_y=(int32_t)pointer_y-(int32_t)w->y;}
-                } else if(w->app==APP_APPEARANCE && pointer_y>=w->y+58u) {
-                    uint32_t column=(pointer_x-(w->x+12u))/152u;
-                    uint32_t row=(pointer_y-(w->y+58u))/18u;
-                    uint32_t index=column*12u+row;
-                    const struct bread_theme *choice=theme_at(index);
-                    if(choice) theme_apply(choice->name);
+                if(pointer_y<view.y+24u) {
+                    if(pointer_x>=view.x+view.width-24u) w->open=0;
+                    else if(workspace_layout[active_workspace]==LAYOUT_FLOAT) {
+                        dragging=i;drag_x=(int32_t)pointer_x-(int32_t)view.x;drag_y=(int32_t)pointer_y-(int32_t)view.y;
+                    }
+                } else if(w->app==APP_APPEARANCE && pointer_y>=view.y+58u) {
+                    if(pointer_x>=view.x+12u) {
+                        uint32_t column=(pointer_x-(view.x+12u))/152u;
+                        uint32_t row=(pointer_y-(view.y+58u))/18u;
+                        uint32_t index=column*12u+row;
+                        const struct bread_theme *choice=theme_at(index);
+                        if(choice) theme_apply(choice->name);
+                    }
                 }
                 break;
             }
         }
     }
-    if(pressed && dragging>=0) {
+    if(pressed && dragging>=0 && workspace_layout[active_workspace]==LAYOUT_FLOAT) {
         struct desktop_window *w=&windows[(uint32_t)dragging];
         int32_t nx=(int32_t)pointer_x-drag_x,ny=(int32_t)pointer_y-drag_y;
         if(nx<0) nx=0;
@@ -225,6 +294,7 @@ int desktop_run(void) {
     if(screen_width<240u || screen_height<200u) return -1;
     for(uint32_t i=0;i<DESKTOP_WINDOWS;i++) windows[i].open=0;
     active_workspace=0;focused_window=DESKTOP_WINDOWS;dragging=-1;previous_buttons=0;
+    for(uint32_t i=0;i<DESKTOP_WORKSPACES;i++){workspace_layout[i]=LAYOUT_DWINDLE;workspace_scroll[i]=0;}
     pointer_x=screen_width/2u;pointer_y=screen_height/2u;
     open_app(APP_SHELL);
     open_app(APP_SYSTEM);
@@ -242,6 +312,9 @@ int desktop_run(void) {
             else if(key=='e' || key=='E'){open_app(APP_SHELL);changed=1;}
             else if(key=='[' && active_workspace) {switch_workspace(active_workspace-1u);changed=1;}
             else if(key==']' && active_workspace+1u<DESKTOP_WORKSPACES){switch_workspace(active_workspace+1u);changed=1;}
+            else if(key=='l' || key=='L'){workspace_layout[active_workspace]=(uint8_t)((workspace_layout[active_workspace]+1u)%3u);workspace_scroll[active_workspace]=0;dragging=-1;changed=1;}
+            else if(key==',' && workspace_layout[active_workspace]==LAYOUT_SCROLL){workspace_scroll[active_workspace]-=56;if(workspace_scroll[active_workspace]<0)workspace_scroll[active_workspace]=0;changed=1;}
+            else if(key=='.' && workspace_layout[active_workspace]==LAYOUT_SCROLL){uint32_t count=0;for(uint32_t i=0;i<DESKTOP_WINDOWS;i++)if(windows[i].open && windows[i].workspace==active_workspace)count++;int32_t maximum=count?(int32_t)((count-1u)*56u):0;if(workspace_scroll[active_workspace]<maximum){workspace_scroll[active_workspace]+=56;if(workspace_scroll[active_workspace]>maximum)workspace_scroll[active_workspace]=maximum;changed=1;}}
             else if(key>='1' && key<='4'){switch_workspace((uint32_t)(key-'1'));changed=1;}
         }
         if(changed) render();
