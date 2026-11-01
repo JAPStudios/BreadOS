@@ -9,6 +9,7 @@
 #include "clipboard.h"
 #include "reminder.h"
 #include "idle.h"
+#include "launcher.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -20,6 +21,7 @@
 #define APP_SYSTEM 3u
 #define APP_NOTIFICATIONS 4u
 #define APP_CLIPBOARD 5u
+#define APP_LAUNCHER 6u
 #define LAYOUT_DWINDLE 0u
 #define LAYOUT_SCROLL 1u
 #define LAYOUT_FLOAT 2u
@@ -37,6 +39,8 @@ extern int bread_file_read(const char *name,char *out,size_t capacity);
 static struct desktop_window windows[DESKTOP_WINDOWS];
 static uint32_t active_workspace,pointer_x,pointer_y,focused_window;
 static size_t selected_file;
+static char launcher_query[32];
+static size_t launcher_results[8],launcher_result_count;
 static uint8_t workspace_layout[DESKTOP_WORKSPACES];
 static int32_t workspace_scroll[DESKTOP_WORKSPACES];
 static int dragging=-1;
@@ -51,6 +55,7 @@ static const char *app_title(uint8_t app) {
         case APP_SYSTEM:return "System";
         case APP_NOTIFICATIONS:return "Notifications";
         case APP_CLIPBOARD:return "Clipboard";
+        case APP_LAUNCHER:return "Launcher";
         default:return "Shell";
     }
 }
@@ -198,6 +203,18 @@ static void draw_window(uint32_t index) {
             if(entry) text(tx,ty,entry,theme->foreground,theme->background);
             ty+=18u;
         }
+    } else if(w->app==APP_LAUNCHER) {
+        text(tx,ty,"SEARCH APPLICATIONS",theme->accent,theme->background);ty+=22u;
+        text(tx,ty,launcher_query,theme->foreground,theme->background);ty+=24u;
+        launcher_result_count=bread_launcher_search(launcher_query,launcher_results,8u);
+        if(!launcher_result_count) text(tx,ty,"No matching applications.",theme->foreground,theme->background);
+        for(size_t i=0;i<launcher_result_count && i<8u && ty+38u<w->y+w->height-4u;i++) {
+            const struct bread_launcher_entry *entry=bread_launcher_entry_at(launcher_results[i]);
+            if(!entry) continue;
+            text(tx,ty,entry->name,theme->accent,theme->background);
+            text(tx+112u,ty,entry->category,theme->foreground,theme->background);ty+=18u;
+            text(tx+8u,ty,entry->description,theme->foreground,theme->background);ty+=20u;
+        }
     } else if(w->app==APP_NOTIFICATIONS) {
         text(tx,ty,"NOTIFICATION HISTORY",theme->accent,theme->background);ty+=24u;
         size_t count=notification_count();
@@ -274,6 +291,7 @@ static void render(void) {
 }
 
 static int open_app(uint8_t app) {
+    if(app==APP_LAUNCHER) launcher_query[0]=0;
     for(uint32_t i=0;i<DESKTOP_WINDOWS;i++) {
         if(windows[i].open && windows[i].workspace==active_workspace && windows[i].app==app) {
             focused_window=i;
@@ -299,6 +317,14 @@ static int open_app(uint8_t app) {
         }
     }
     return -1;
+}
+
+static void launch_result(size_t result) {
+    if(result>=launcher_result_count) return;
+    const struct bread_launcher_entry *entry=bread_launcher_entry_at(launcher_results[result]);
+    if(!entry) return;
+    for(uint32_t i=0;i<DESKTOP_WINDOWS;i++) if(windows[i].open && windows[i].app==APP_LAUNCHER) windows[i].open=0;
+    open_app(entry->app_id);
 }
 
 static void switch_workspace(uint32_t workspace) {
@@ -340,6 +366,9 @@ static void mouse_event(const struct mouse_event *event) {
                 } else if(w->app==APP_CLIPBOARD && pointer_y>=view.y+80u) {
                     uint32_t row=(pointer_y-(view.y+80u))/18u;
                     if(row<clipboard_history_count() && row<6u) clipboard_restore(row);
+                } else if(w->app==APP_LAUNCHER && pointer_y>=view.y+80u) {
+                    uint32_t row=(pointer_y-(view.y+80u))/38u;
+                    launch_result(row);
                 } else if(w->app==APP_NOTIFICATIONS && pointer_y>=view.y+58u) {
                     uint32_t row=(pointer_y-(view.y+58u))/42u;
                     if(row<notification_count() && row<5u) notification_dismiss(row);
@@ -404,7 +433,14 @@ int desktop_run(void) {
             now=timer_ticks();
             if(idle_is_active()) {idle_activity(now);changed=1;continue;}
             idle_activity(now);
-            if(key=='q' || key=='Q') return 0;
+            if(focused_window<DESKTOP_WINDOWS && windows[focused_window].open && windows[focused_window].app==APP_LAUNCHER) {
+                if(key=='\n' || key=='\r') launch_result(0);
+                else if(key=='\b') {size_t length=0;while(launcher_query[length])length++;if(length)launcher_query[length-1u]=0;}
+                else if(key>=32 && key<=126) {size_t length=0;while(launcher_query[length])length++;if(length<sizeof(launcher_query)-1u){launcher_query[length]=key;launcher_query[length+1u]=0;}}
+                changed=1;continue;
+            }
+            if(key==' ') {open_app(APP_LAUNCHER);changed=1;}
+            else if(key=='q' || key=='Q') return 0;
             if(key=='t' || key=='T'){open_app(APP_APPEARANCE);changed=1;}
             else if(key=='f' || key=='F'){open_app(APP_FILES);changed=1;}
             else if(key=='s' || key=='S'){open_app(APP_SYSTEM);changed=1;}
