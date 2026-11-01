@@ -48,6 +48,10 @@ static int32_t drag_x,drag_y;
 static uint8_t previous_buttons;
 static uint32_t screen_width,screen_height;
 
+static void text(uint32_t x,uint32_t y,const char *value,uint32_t color,
+                 uint32_t background);
+static void decimal(uint32_t value,char output[11]);
+
 /* Native telemetry history for the live system HUD. Values are scheduler
  * context switches per second, not a fabricated CPU-utilization estimate. */
 #define METRIC_HISTORY 32u
