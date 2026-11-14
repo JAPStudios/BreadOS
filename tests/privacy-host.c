@@ -38,6 +38,13 @@ int main(void) {
     assert(privacy_allows(BREAD_PRIVACY_CAMERA));
     assert(privacy_deserialize("P2:1001000")==-1);
     assert(privacy_deserialize("P1:10010000")==-1);
+    /* Truncated input must fail without reading beyond the terminator. */
+    assert(privacy_deserialize("")==-1);
+    assert(privacy_deserialize("P")==-1);
+    assert(privacy_deserialize("P1")==-1);
+    assert(privacy_deserialize("P1:")==-1);
+    assert(privacy_deserialize("P1:1")==-1);
+    assert(privacy_allows(BREAD_PRIVACY_CAMERA));
     assert(privacy_serialize(encoded,4)==-1);
     privacy_reset();
     assert(!privacy_allows(BREAD_PRIVACY_CAMERA));
