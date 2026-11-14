@@ -25,6 +25,15 @@ int main(void) {
     assert(privacy_allows(BREAD_PRIVACY_MICROPHONE));
     assert(privacy_allows(BREAD_PRIVACY_NETWORK));
     assert(!privacy_allows(BREAD_PRIVACY_LOCATION));
+    assert(privacy_deserialize("P1:0100000\\n")==0);
+    assert(!privacy_allows(BREAD_PRIVACY_CAMERA));
+    assert(privacy_allows(BREAD_PRIVACY_MICROPHONE));
+    assert(privacy_deserialize("P1:1000000\\r\\n")==0);
+    assert(privacy_allows(BREAD_PRIVACY_CAMERA));
+    assert(privacy_deserialize("P1:0100000\\nX")==-1);
+    assert(privacy_allows(BREAD_PRIVACY_CAMERA));
+    assert(privacy_deserialize("P1:0100000\\rX")==-1);
+    assert(privacy_allows(BREAD_PRIVACY_CAMERA));
     assert(privacy_deserialize("P1:10010x0")==-1);
     assert(privacy_allows(BREAD_PRIVACY_CAMERA));
     assert(privacy_deserialize("P2:1001000")==-1);
