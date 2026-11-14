@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "paging.h"
+#include "memory.h"
 
 #define PAGE_SIZE 4096u
 #define PAGE_ENTRIES 1024u
@@ -12,14 +13,16 @@
 #define PAGE_CACHE_DISABLE 0x010u
 #define FB_VIRTUAL_BASE 0xE0000000u
 #define FB_PDE_INDEX (FB_VIRTUAL_BASE >> 22)
-#define USER_REGION_START 0x00400000u
-#define USER_REGION_END 0x00800000u
+#define USER_REGION_START 0x40000000u
+#define USER_REGION_END 0x40400000u
+#define USER_PDE_INDEX (USER_REGION_START >> 22)
 
 static uint32_t page_directory[PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
 static uint32_t page_tables[IDENTITY_MAP_BYTES / PAGE_SIZE / PAGE_ENTRIES]
                            [PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
 static uint32_t framebuffer_table[PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
 static int paging_enabled;
+static uint32_t active_directory_physical;
 
 static void invalidate_page(uint32_t address) {
     __asm__ volatile("invlpg (%0)" : : "r"((void *)(uintptr_t)address) : "memory");
@@ -36,7 +39,8 @@ void paging_init(void) {
         page_directory[table] = (uint32_t)(uintptr_t)&page_tables[table][0] |
                                 PAGE_PRESENT | PAGE_WRITABLE;
     }
-    __asm__ volatile("mov %0, %%cr3" : : "r"((uint32_t)(uintptr_t)page_directory) : "memory");
+    active_directory_physical = (uint32_t)(uintptr_t)page_directory;
+    __asm__ volatile("mov %0, %%cr3" : : "r"(active_directory_physical) : "memory");
     uint32_t cr0;
     __asm__ volatile("mov %%cr0, %0" : "=r"(cr0));
     cr0 |= 0x80010000u; /* Enable paging and supervisor write protection. */
@@ -60,41 +64,98 @@ void *paging_map_framebuffer(uint64_t physical_address, uint32_t length) {
     }
     page_directory[FB_PDE_INDEX] = (uint32_t)(uintptr_t)framebuffer_table |
                                    PAGE_PRESENT | PAGE_WRITABLE;
-    __asm__ volatile("mov %0, %%cr3" : : "r"((uint32_t)(uintptr_t)page_directory) : "memory");
+    __asm__ volatile("mov %0, %%cr3" : : "r"(active_directory_physical) : "memory");
     return (void *)(uintptr_t)(FB_VIRTUAL_BASE + (uint32_t)offset);
 }
 
-int paging_map_user_page(uint32_t virtual_address, uint32_t physical_address,
-                         int writable) {
-    if (!paging_enabled || (virtual_address & (PAGE_SIZE-1u)) ||
-        (physical_address & (PAGE_SIZE-1u)) ||
-        virtual_address < USER_REGION_START || virtual_address >= USER_REGION_END ||
-        physical_address >= IDENTITY_MAP_BYTES)
+int paging_address_space_create(struct paging_address_space *space) {
+    if (!paging_enabled || !space) return -1;
+    space->directory_physical = 0;
+    space->user_table_physical = 0;
+
+    uint32_t directory_frame = memory_alloc_frame();
+    if (!directory_frame) return -1;
+    uint32_t table_frame = memory_alloc_frame();
+    if (!table_frame) {
+        memory_free_frame(directory_frame);
         return -1;
-    if (writable != 0 && writable != 1) return -1;
-    uint32_t directory_index=virtual_address>>22;
-    uint32_t table_index=(virtual_address>>12)&0x3FFu;
-    /* Never silently replace a live user mapping: doing so can orphan the
-       original frame and invalidate the caller's ownership assumptions. */
-    if (page_tables[directory_index][table_index] & PAGE_USER) return -1;
-    uint32_t flags=PAGE_PRESENT|PAGE_USER;
-    if (writable) flags|=PAGE_WRITABLE;
-    page_tables[directory_index][table_index]=physical_address|flags;
-    page_directory[directory_index]|=PAGE_USER;
-    invalidate_page(virtual_address);
+    }
+
+    uint32_t *directory = (uint32_t *)(uintptr_t)directory_frame;
+    uint32_t *user_table = (uint32_t *)(uintptr_t)table_frame;
+    for (uint32_t i = 0; i < PAGE_ENTRIES; ++i) {
+        directory[i] = page_directory[i];
+        user_table[i] = 0;
+    }
+    directory[USER_PDE_INDEX] = table_frame | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+
+    space->directory_physical = directory_frame;
+    space->user_table_physical = table_frame;
     return 0;
 }
 
-void paging_unmap_user_page(uint32_t virtual_address) {
-    if (!paging_enabled || (virtual_address & (PAGE_SIZE-1u)) ||
+void paging_address_space_destroy(struct paging_address_space *space) {
+    if (!space || !space->directory_physical || !space->user_table_physical) return;
+    if (active_directory_physical == space->directory_physical)
+        paging_switch_kernel_address_space();
+    memory_free_frame(space->user_table_physical);
+    memory_free_frame(space->directory_physical);
+    space->directory_physical = 0;
+    space->user_table_physical = 0;
+}
+
+int paging_address_space_map_user_page(struct paging_address_space *space,
+                                       uint32_t virtual_address,
+                                       uint32_t physical_address,
+                                       int writable) {
+    if (!paging_enabled || !space || !space->directory_physical ||
+        !space->user_table_physical ||
+        (virtual_address & (PAGE_SIZE - 1u)) ||
+        (physical_address & (PAGE_SIZE - 1u)) ||
+        virtual_address < USER_REGION_START || virtual_address >= USER_REGION_END ||
+        physical_address >= IDENTITY_MAP_BYTES ||
+        (writable != 0 && writable != 1))
+        return -1;
+
+    uint32_t *table = (uint32_t *)(uintptr_t)space->user_table_physical;
+    uint32_t index = (virtual_address >> 12) & 0x3FFu;
+    if (table[index] & PAGE_PRESENT) return -1;
+
+    uint32_t flags = PAGE_PRESENT | PAGE_USER;
+    if (writable) flags |= PAGE_WRITABLE;
+    table[index] = physical_address | flags;
+    if (active_directory_physical == space->directory_physical)
+        invalidate_page(virtual_address);
+    return 0;
+}
+
+void paging_address_space_unmap_user_page(struct paging_address_space *space,
+                                          uint32_t virtual_address) {
+    if (!space || !space->directory_physical || !space->user_table_physical ||
+        (virtual_address & (PAGE_SIZE - 1u)) ||
         virtual_address < USER_REGION_START || virtual_address >= USER_REGION_END)
         return;
-    uint32_t directory_index=virtual_address>>22;
-    uint32_t table_index=(virtual_address>>12)&0x3FFu;
-    page_tables[directory_index][table_index]=virtual_address|PAGE_PRESENT|PAGE_WRITABLE;
-    invalidate_page(virtual_address);
-    int any_user=0;
-    for (uint32_t i=0;i<PAGE_ENTRIES;i++)
-        if (page_tables[directory_index][i]&PAGE_USER) { any_user=1; break; }
-    if (!any_user) page_directory[directory_index]&=~PAGE_USER;
+
+    uint32_t *table = (uint32_t *)(uintptr_t)space->user_table_physical;
+    uint32_t index = (virtual_address >> 12) & 0x3FFu;
+    table[index] = 0;
+    if (active_directory_physical == space->directory_physical)
+        invalidate_page(virtual_address);
+}
+
+int paging_switch_address_space(const struct paging_address_space *space) {
+    if (!paging_enabled || !space || !space->directory_physical ||
+        !space->user_table_physical ||
+        (space->directory_physical & (PAGE_SIZE - 1u)) ||
+        (space->user_table_physical & (PAGE_SIZE - 1u)))
+        return -1;
+    active_directory_physical = space->directory_physical;
+    __asm__ volatile("mov %0, %%cr3" : : "r"(active_directory_physical) : "memory");
+    return 0;
+}
+
+void paging_switch_kernel_address_space(void) {
+    if (!paging_enabled) return;
+    active_directory_physical = (uint32_t)(uintptr_t)page_directory;
+    __asm__ volatile("mov %0, %%cr3" : : "r"(active_directory_physical) : "memory");
 }
