@@ -307,8 +307,9 @@ int pfs_move(const char *source, const char *destination) {
 int pfs_read_binary(const char *path, void *out, size_t capacity) {
     if (!ready || !valid_path(path) || !out) return -1;
     int slot=find(path);
-    if (slot<0 || directory[slot].reserved!=2u || capacity<directory[slot].size)
-        return -1;
+    if (slot<0 || directory[slot].reserved!=2u || capacity<directory[slot].size ||
+        PFS_BINARY_LBA+(uint32_t)slot*PFS_BINARY_SECTORS_PER_FILE+
+        PFS_BINARY_SECTORS_PER_FILE>ata_sector_count()) return -1;
     uint8_t sector[PFS_SECTOR_SIZE];
     uint8_t *destination=(uint8_t *)out;
     size_t remaining=directory[slot].size;
@@ -331,6 +332,8 @@ int pfs_write_binary(const char *path,const void *data,size_t size) {
     if(find_dir(path)>=0) return -1;
     if(slot<0) slot=free_slot();
     if(slot<0) return -2;
+    if(PFS_BINARY_LBA+(uint32_t)slot*PFS_BINARY_SECTORS_PER_FILE+
+       PFS_BINARY_SECTORS_PER_FILE>ata_sector_count()) return -3;
 
     const uint8_t *source=(const uint8_t *)data;
     uint8_t sector[PFS_SECTOR_SIZE];
