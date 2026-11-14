@@ -35,7 +35,7 @@ $(BUILD)/paging.o: paging.c paging.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/elf_loader.o: elf_loader.c elf_loader.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
-$(BUILD)/process.o: process.c process.h memory.h paging.h syscall.h | $(BUILD)
+$(BUILD)/process.o: process.c process.h memory.h paging.h syscall.h elf_loader.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/syscall.o: syscall.c syscall.h video.h console.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
