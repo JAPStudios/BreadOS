@@ -4,8 +4,8 @@
 #include "syscall.h"
 #include <stdint.h>
 
-#define USER_CODE_ADDRESS 0x00400000u
-#define USER_STACK_ADDRESS 0x00401000u
+#define USER_CODE_ADDRESS 0x40000000u
+#define USER_STACK_ADDRESS 0x40001000u
 #define PAGE_SIZE 4096u
 
 extern void user_enter(uint32_t entry, uint32_t user_stack);
@@ -27,31 +27,50 @@ int process_run_user_demo(void) {
         0xCD,0x80,                     /* int 0x80 */
         0xEB,0xFE                      /* defensive infinite loop */
     };
+
+    struct paging_address_space address_space = {0, 0};
     uint32_t code_frame=memory_alloc_frame();
     if (!code_frame) return -1;
     uint32_t stack_frame=memory_alloc_frame();
-    if (!stack_frame) { memory_free_frame(code_frame); return -1; }
+    if (!stack_frame) {
+        memory_free_frame(code_frame);
+        return -1;
+    }
+    if (paging_address_space_create(&address_space)<0) {
+        memory_free_frame(stack_frame);
+        memory_free_frame(code_frame);
+        return -1;
+    }
+
     zero_page(code_frame);
     zero_page(stack_frame);
     volatile uint8_t *code=(volatile uint8_t *)(uintptr_t)code_frame;
     for (uint32_t i=0;i<sizeof(program);i++) code[i]=program[i];
 
-    if (paging_map_user_page(USER_CODE_ADDRESS,code_frame,0)<0) {
+    if (paging_address_space_map_user_page(&address_space,USER_CODE_ADDRESS,
+                                           code_frame,0)<0 ||
+        paging_address_space_map_user_page(&address_space,USER_STACK_ADDRESS,
+                                           stack_frame,1)<0) {
+        paging_address_space_destroy(&address_space);
         memory_free_frame(stack_frame);
         memory_free_frame(code_frame);
         return -1;
     }
-    if (paging_map_user_page(USER_STACK_ADDRESS,stack_frame,1)<0) {
-        paging_unmap_user_page(USER_CODE_ADDRESS);
+
+    if (paging_switch_address_space(&address_space)<0) {
+        paging_address_space_destroy(&address_space);
         memory_free_frame(stack_frame);
         memory_free_frame(code_frame);
         return -1;
     }
 
     user_enter(USER_CODE_ADDRESS,USER_STACK_ADDRESS+PAGE_SIZE-16u);
+    paging_switch_kernel_address_space();
+
     int exit_code=syscall_last_exit_code();
-    paging_unmap_user_page(USER_STACK_ADDRESS);
-    paging_unmap_user_page(USER_CODE_ADDRESS);
+    paging_address_space_unmap_user_page(&address_space,USER_STACK_ADDRESS);
+    paging_address_space_unmap_user_page(&address_space,USER_CODE_ADDRESS);
+    paging_address_space_destroy(&address_space);
     memory_free_frame(stack_frame);
     memory_free_frame(code_frame);
     return exit_code;
