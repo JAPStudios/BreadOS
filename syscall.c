@@ -55,4 +55,6 @@ int syscall_abort_user_exception(uint32_t *saved_frame, uint32_t vector,
     return 1;
 }
 
+void syscall_begin_process(void) { last_exit_code = -1; }
+
 int syscall_last_exit_code(void) { return last_exit_code; }
