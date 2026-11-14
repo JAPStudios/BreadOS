@@ -49,6 +49,16 @@ int main(void) {
     put32(84,1);put32(88,4096);put32(92,ELF32_USER_START);
     put32(100,1);put32(104,4096);put32(108,4);put32(112,4096);
     assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    /* Reject empty memory ranges and file data larger than the mapped range. */
+    make_image();put32(72,0);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    make_image();put32(68,4097);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    /* Reject writable-and-executable pages, unknown flags and unreadable loads. */
+    make_image();put32(76,7);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    make_image();put32(76,13);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    make_image();put32(76,1);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    /* A load segment cannot extend into the reserved user stack page. */
+    make_image();put32(60,ELF32_USER_START+0x3FF000);put32(72,8192);
+    assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
     puts("ELF loader validation tests passed");
     return 0;
 }
