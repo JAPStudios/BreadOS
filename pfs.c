@@ -9,6 +9,9 @@
 #define PFS_VERSION 1u
 #define PFS_DIRECTORY_LBA 1u
 #define PFS_DATA_LBA 2u
+#define PFS_BINARY_LBA 2048u
+#define PFS_BINARY_SECTORS_PER_FILE 128u
+#define PFS_BINARY_MAX_SIZE (PFS_BINARY_SECTORS_PER_FILE * PFS_SECTOR_SIZE)
 
 struct pfs_superblock {
     uint32_t magic;
@@ -111,7 +114,7 @@ static int write_directory(void) {
     return ata_write_sector(PFS_DIRECTORY_LBA, sector);
 }
 static int valid_entry(const struct pfs_entry *entry) {
-    if (entry->used > 1u || entry->reserved > 1u) return 0;
+    if (entry->used > 1u || entry->reserved > 2u) return 0;
     if (!entry->used) return 1;
 
     /* Validate termination before passing untrusted disk strings to helpers. */
@@ -119,7 +122,7 @@ static int valid_entry(const struct pfs_entry *entry) {
     for (size_t i = 0; i < sizeof(entry->name); ++i) {
         if (entry->name[i] == '\0') { terminated = 1; break; }
     }
-    if (!terminated || entry->size > FS_DATA_MAX) return 0;
+    if (!terminated || (entry->reserved != 2u && entry->size > FS_DATA_MAX)) return 0;
     size_t n = string_length(entry->name);
     if (entry->reserved == 1u) {
         if (n < 2u || n > FS_NAME_MAX || entry->name[n - 1u] != '/' ||
@@ -234,7 +237,7 @@ int pfs_write(const char *path, const char *data) {
 int pfs_remove(const char *path) {
     if (!ready || !valid_path(path)) return -1;
     int slot = find(path);
-    if (slot < 0 || directory[slot].reserved != 0u) return -1;
+    if (slot < 0 || directory[slot].reserved == 1u) return -1;
     struct pfs_entry previous = directory[slot];
     zero_bytes(&directory[slot], sizeof(directory[slot]));
     if (write_directory() != 0) {
@@ -286,7 +289,7 @@ int pfs_move(const char *source, const char *destination) {
     if (!ready || !valid_path(source) || !valid_path(destination) ||
         !parent_exists(destination)) return -1;
     int src = find(source);
-    if (src < 0 || directory[src].reserved != 0u ||
+    if (src < 0 || directory[src].reserved == 1u ||
         find(destination) >= 0 || find_dir(destination) >= 0) return -1;
     struct pfs_entry previous = directory[src];
     size_t n = string_length(destination);
@@ -298,4 +301,60 @@ int pfs_move(const char *source, const char *destination) {
         return -2;
     }
     return 0;
+}
+
+
+int pfs_read_binary(const char *path, void *out, size_t capacity) {
+    if (!ready || !valid_path(path) || !out) return -1;
+    int slot=find(path);
+    if (slot<0 || directory[slot].reserved!=2u || capacity<directory[slot].size)
+        return -1;
+    uint8_t sector[PFS_SECTOR_SIZE];
+    uint8_t *destination=(uint8_t *)out;
+    size_t remaining=directory[slot].size;
+    uint32_t lba=PFS_BINARY_LBA+(uint32_t)slot*PFS_BINARY_SECTORS_PER_FILE;
+    for(uint32_t i=0;remaining;i++,remaining-=remaining>PFS_SECTOR_SIZE?PFS_SECTOR_SIZE:remaining) {
+        if(ata_read_sector(lba+i,sector)!=0) return -1;
+        size_t count=remaining>PFS_SECTOR_SIZE?PFS_SECTOR_SIZE:remaining;
+        copy_bytes(destination,sector,count);
+        destination+=count;
+    }
+    return (int)directory[slot].size;
+}
+
+int pfs_write_binary(const char *path,const void *data,size_t size) {
+    if(!ready || !valid_path(path) || (!data && size) ||
+       size>PFS_BINARY_MAX_SIZE) return -1;
+    if(!parent_exists(path)) return -1;
+    int slot=find(path);
+    if(slot>=0 && directory[slot].reserved==1u) return -1;
+    if(find_dir(path)>=0) return -1;
+    if(slot<0) slot=free_slot();
+    if(slot<0) return -2;
+
+    const uint8_t *source=(const uint8_t *)data;
+    uint8_t sector[PFS_SECTOR_SIZE];
+    size_t remaining=size;
+    uint32_t lba=PFS_BINARY_LBA+(uint32_t)slot*PFS_BINARY_SECTORS_PER_FILE;
+    for(uint32_t i=0;remaining;i++,remaining-=remaining>PFS_SECTOR_SIZE?PFS_SECTOR_SIZE:remaining) {
+        zero_bytes(sector,sizeof(sector));
+        size_t count=remaining>PFS_SECTOR_SIZE?PFS_SECTOR_SIZE:remaining;
+        copy_bytes(sector,source,count);
+        if(ata_write_sector(lba+i,sector)!=0) return -3;
+        source+=count;
+    }
+
+    struct pfs_entry previous=directory[slot];
+    if(!previous.used) zero_bytes(&directory[slot],sizeof(directory[slot]));
+    size_t name_len=string_length(path);
+    zero_bytes(directory[slot].name,sizeof(directory[slot].name));
+    copy_bytes(directory[slot].name,path,name_len);
+    directory[slot].size=(uint16_t)size;
+    directory[slot].used=1;
+    directory[slot].reserved=2;
+    if(write_directory()!=0) {
+        directory[slot]=previous;
+        return -3;
+    }
+    return (int)size;
 }
