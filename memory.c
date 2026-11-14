@@ -8,6 +8,7 @@
  * map is extended, never advertise or allocate frames outside that range. */
 #define DIRECT_MAP_LIMIT (16u * 1024u * 1024u)
 #define DIRECT_MAP_FRAMES (DIRECT_MAP_LIMIT / PAGE_SIZE)
+#define ALLOCATION_BITMAP_WORDS (DIRECT_MAP_FRAMES / 32u)
 #define MB_FLAG_MEMORY  (1u << 0)
 #define MB_FLAG_MMAP    (1u << 6)
 
@@ -21,6 +22,8 @@ struct mmap_entry {
 } __attribute__((packed));
 
 static uint32_t bitmap[BITMAP_WORDS];
+/* Tracks frames handed out by this allocator, separately from reserved RAM. */
+static uint32_t allocated_bitmap[ALLOCATION_BITMAP_WORDS];
 static uint32_t free_count;
 static uint32_t scan_hint;
 extern uint8_t kernel_end[];
@@ -58,6 +61,8 @@ void memory_init(uint32_t info_address) {
     for (uint32_t i = 0; i < BITMAP_WORDS; ++i) bitmap[i] = 0xFFFFFFFFu;
     free_count = 0;
     scan_hint = 256u;
+    for (uint32_t i = 0; i < ALLOCATION_BITMAP_WORDS; ++i)
+        allocated_bitmap[i] = 0;
     const struct multiboot_info *info =
         (const struct multiboot_info *)(uintptr_t)info_address;
     if (info && (info->flags & MB_FLAG_MMAP) && info->mmap_length) {
@@ -86,6 +91,7 @@ uint32_t memory_alloc_frame(void) {
         uint32_t frame = (scan_hint + scanned) % DIRECT_MAP_FRAMES;
         if (!(bitmap[frame >> 5] & (1u << (frame & 31u)))) {
             mark_used(frame);
+            allocated_bitmap[frame >> 5] |= 1u << (frame & 31u);
             scan_hint = (frame + 1u) % DIRECT_MAP_FRAMES;
             return frame * PAGE_SIZE;
         }
@@ -95,7 +101,13 @@ uint32_t memory_alloc_frame(void) {
 void memory_free_frame(uint32_t address) {
     if ((address & (PAGE_SIZE - 1u)) || address == 0 ||
         address >= DIRECT_MAP_LIMIT) return;
-    mark_free(address / PAGE_SIZE);
+    uint32_t frame = address / PAGE_SIZE;
+    uint32_t mask = 1u << (frame & 31u);
+    uint32_t *owned = &allocated_bitmap[frame >> 5];
+    /* Ignore reserved frames and duplicate frees; neither is allocator-owned. */
+    if (!(*owned & mask)) return;
+    *owned &= ~mask;
+    mark_free(frame);
 }
 uint32_t memory_free_frames(void) { return free_count; }
 uint32_t memory_total_frames(void) { return FRAME_COUNT; }
