@@ -71,8 +71,12 @@ int paging_map_user_page(uint32_t virtual_address, uint32_t physical_address,
         virtual_address < USER_REGION_START || virtual_address >= USER_REGION_END ||
         physical_address >= IDENTITY_MAP_BYTES)
         return -1;
+    if (writable != 0 && writable != 1) return -1;
     uint32_t directory_index=virtual_address>>22;
     uint32_t table_index=(virtual_address>>12)&0x3FFu;
+    /* Never silently replace a live user mapping: doing so can orphan the
+       original frame and invalidate the caller's ownership assumptions. */
+    if (page_tables[directory_index][table_index] & PAGE_USER) return -1;
     uint32_t flags=PAGE_PRESENT|PAGE_USER;
     if (writable) flags|=PAGE_WRITABLE;
     page_tables[directory_index][table_index]=physical_address|flags;
