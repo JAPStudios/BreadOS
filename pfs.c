@@ -122,7 +122,13 @@ static int write_directory(void) {
 }
 static int valid_entry(const struct pfs_entry *entry) {
     if (entry->used > 1u || entry->reserved > 2u) return 0;
-    if (!entry->used) return 1;
+    if (!entry->used) {
+        /* Unused directory slots must not retain stale or contradictory data. */
+        const uint8_t *bytes=(const uint8_t *)entry;
+        for (size_t i=0;i<sizeof(*entry);i++)
+            if (bytes[i]!=0) return 0;
+        return 1;
+    }
 
     /* Validate termination before passing untrusted disk strings to helpers. */
     int terminated = 0;
