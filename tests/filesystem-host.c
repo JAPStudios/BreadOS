@@ -131,6 +131,31 @@ static void test_persistent_binary_files(void) {
     assert(pfs_write_binary("bad/name",source,sizeof(source))==-1);
 }
 
+
+static void test_duplicate_persistent_entries_are_rejected(void) {
+    make_valid_volume();
+    memset(disk[1],0,SECTOR_SIZE);
+    assert(pfs_init()==1);
+    assert(pfs_write("alpha","one")==3);
+    assert(pfs_write("beta","two")==3);
+    const size_t entry_size=FS_NAME_MAX+1u+sizeof(uint16_t)+2u;
+    memcpy(disk[1]+entry_size,disk[1],entry_size);
+    assert(pfs_init()==0);
+    assert(pfs_ready()==0);
+}
+
+static void test_orphaned_persistent_child_is_rejected(void) {
+    make_valid_volume();
+    memset(disk[1],0,SECTOR_SIZE);
+    assert(pfs_init()==1);
+    assert(pfs_mkdir("docs")==0);
+    assert(pfs_write("docs/note","inside")==6);
+    /* Remove the parent directory entry directly, leaving its child behind. */
+    memset(disk[1],0,FS_NAME_MAX+1u+sizeof(uint16_t)+2u);
+    assert(pfs_init()==0);
+    assert(pfs_ready()==0);
+}
+
 int main(void) {
     test_ram_filesystem_null_arguments();
     test_persistent_filesystem_null_arguments();
@@ -138,6 +163,8 @@ int main(void) {
     test_persistent_directories_and_moves();
     test_malformed_disk_name_is_rejected();
     test_persistent_binary_files();
+    test_duplicate_persistent_entries_are_rejected();
+    test_orphaned_persistent_child_is_rejected();
     puts("Filesystem host regression tests passed.");
     return 0;
 }
