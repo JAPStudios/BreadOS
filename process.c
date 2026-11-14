@@ -99,7 +99,7 @@ static int process_add_page(struct paging_address_space *space,
     return 0;
 }
 
-int process_execute_elf(const void *bytes,size_t size) {
+static int process_execute_elf_inner(const void *bytes,size_t size) {
     struct elf32_image image;
     if (elf32_inspect(bytes,size,&image)<0) return -1;
 
@@ -152,6 +152,17 @@ int process_execute_elf(const void *bytes,size_t size) {
     return exit_code;
 }
 
+
+/* The page ledger and ELF staging buffers are shared kernel state. */
+static int process_execution_active;
+
+int process_execute_elf(const void *bytes,size_t size) {
+    if (process_execution_active) return -1;
+    process_execution_active=1;
+    int result=process_execute_elf_inner(bytes,size);
+    process_execution_active=0;
+    return result;
+}
 
 int process_execute_file(const char *path) {
     static uint8_t executable[65535];
