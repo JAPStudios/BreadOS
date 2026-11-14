@@ -8,6 +8,7 @@ void syscall_dispatch(uint32_t *saved_frame);
 /* Convert recoverable ring-3 exceptions into process termination. */
 int syscall_abort_user_exception(uint32_t *saved_frame, uint32_t vector,
                                  uint32_t error_code);
+void syscall_begin_process(void);
 int syscall_last_exit_code(void);
 
 #endif
