@@ -1,0 +1,41 @@
+#include "elf_loader.h"
+#include <assert.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+static uint8_t image_bytes[8192];
+static void put16(size_t o,uint16_t v){image_bytes[o]=(uint8_t)v;image_bytes[o+1]=(uint8_t)(v>>8);}
+static void put32(size_t o,uint32_t v){for(unsigned i=0;i<4;i++)image_bytes[o+i]=(uint8_t)(v>>(8*i));}
+static void make_image(void) {
+    memset(image_bytes,0,sizeof(image_bytes));
+    image_bytes[0]=0x7F;image_bytes[1]='E';image_bytes[2]='L';image_bytes[3]='F';
+    image_bytes[4]=1;image_bytes[5]=1;image_bytes[6]=1;
+    put16(16,2);put16(18,3);put32(20,1);put32(24,ELF32_USER_START);
+    put32(28,52);put16(40,52);put16(42,32);put16(44,1);
+    put32(52,1);put32(56,4096);put32(60,ELF32_USER_START);
+    put32(68,4);put32(72,4096);put32(76,5);put32(80,4096);
+    image_bytes[4096]=0x90;image_bytes[4097]=0x90;
+    image_bytes[4098]=0x90;image_bytes[4099]=0xC3;
+}
+int main(void) {
+    struct elf32_image parsed;
+    struct elf32_load_segment segment;
+    make_image();
+    assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==0);
+    assert(parsed.entry==ELF32_USER_START);
+    assert(elf32_load_segment_at(&parsed,0,&segment)==0);
+    assert(segment.offset==4096 && segment.file_size==4 && segment.memory_size==4096);
+    assert(elf32_load_segment_at(&parsed,1,&segment)==-1);
+
+    assert(elf32_inspect(image_bytes,100,&parsed)==-1);
+    make_image();image_bytes[0]=0;assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    make_image();put16(18,0x3E);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    make_image();put32(68,9000);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    make_image();put32(72,0x403FF000);put32(80,8192);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    make_image();put32(76,7);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    make_image();put32(24,ELF32_USER_START+0x1000);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    make_image();put32(28,0xFFFFFFF0);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    puts("ELF loader validation tests passed");
+    return 0;
+}
