@@ -33,6 +33,8 @@ $(BUILD)/pfs.o: pfs.c pfs.h ata.h fs.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/paging.o: paging.c paging.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
+$(BUILD)/elf_loader.o: elf_loader.c elf_loader.h | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/process.o: process.c process.h memory.h paging.h syscall.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/syscall.o: syscall.c syscall.h video.h console.h | $(BUILD)
@@ -71,8 +73,8 @@ $(BUILD)/interrupts.o: interrupts.s | $(BUILD)
 	$(AS) --32 $< -o $@
 $(BUILD)/interrupts_c.o: interrupts.c interrupts.h task.h video.h kernel/keyboard.h kernel/mouse.h syscall.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
-$(BUILD)/kernel.elf: $(BUILD)/pci.o $(BUILD)/audio.o $(BUILD)/boot.o $(BUILD)/gdt.o $(BUILD)/gdt_load.o $(BUILD)/usermode.o $(BUILD)/process.o $(BUILD)/syscall.o $(BUILD)/kernel.o $(BUILD)/keyboard.o $(BUILD)/mouse.o $(BUILD)/memory.o $(BUILD)/heap.o $(BUILD)/fs.o $(BUILD)/ata.o $(BUILD)/pfs.o $(BUILD)/paging.o $(BUILD)/video.o $(BUILD)/theme.o $(BUILD)/menu.o $(BUILD)/desktop.o $(BUILD)/notification.o $(BUILD)/clipboard.o $(BUILD)/reminder.o $(BUILD)/idle.o $(BUILD)/launcher.o $(BUILD)/privacy.o $(BUILD)/secure_memory.o $(BUILD)/task.o $(BUILD)/interrupts.o $(BUILD)/interrupts_c.o linker.ld
-	$(LD) $(LDFLAGS) -o $@ $(BUILD)/pci.o $(BUILD)/audio.o $(BUILD)/boot.o $(BUILD)/gdt.o $(BUILD)/gdt_load.o $(BUILD)/usermode.o $(BUILD)/process.o $(BUILD)/syscall.o $(BUILD)/interrupts.o $(BUILD)/interrupts_c.o $(BUILD)/memory.o $(BUILD)/heap.o $(BUILD)/fs.o $(BUILD)/ata.o $(BUILD)/pfs.o $(BUILD)/paging.o $(BUILD)/video.o $(BUILD)/theme.o $(BUILD)/menu.o $(BUILD)/desktop.o $(BUILD)/notification.o $(BUILD)/clipboard.o $(BUILD)/reminder.o $(BUILD)/idle.o $(BUILD)/launcher.o $(BUILD)/privacy.o $(BUILD)/secure_memory.o $(BUILD)/task.o $(BUILD)/keyboard.o $(BUILD)/mouse.o $(BUILD)/kernel.o
+$(BUILD)/kernel.elf: $(BUILD)/elf_loader.o $(BUILD)/pci.o $(BUILD)/audio.o $(BUILD)/boot.o $(BUILD)/gdt.o $(BUILD)/gdt_load.o $(BUILD)/usermode.o $(BUILD)/process.o $(BUILD)/syscall.o $(BUILD)/kernel.o $(BUILD)/keyboard.o $(BUILD)/mouse.o $(BUILD)/memory.o $(BUILD)/heap.o $(BUILD)/fs.o $(BUILD)/ata.o $(BUILD)/pfs.o $(BUILD)/paging.o $(BUILD)/video.o $(BUILD)/theme.o $(BUILD)/menu.o $(BUILD)/desktop.o $(BUILD)/notification.o $(BUILD)/clipboard.o $(BUILD)/reminder.o $(BUILD)/idle.o $(BUILD)/launcher.o $(BUILD)/privacy.o $(BUILD)/secure_memory.o $(BUILD)/task.o $(BUILD)/interrupts.o $(BUILD)/interrupts_c.o linker.ld
+	$(LD) $(LDFLAGS) -o $@ $(BUILD)/elf_loader.o $(BUILD)/pci.o $(BUILD)/audio.o $(BUILD)/boot.o $(BUILD)/gdt.o $(BUILD)/gdt_load.o $(BUILD)/usermode.o $(BUILD)/process.o $(BUILD)/syscall.o $(BUILD)/interrupts.o $(BUILD)/interrupts_c.o $(BUILD)/memory.o $(BUILD)/heap.o $(BUILD)/fs.o $(BUILD)/ata.o $(BUILD)/pfs.o $(BUILD)/paging.o $(BUILD)/video.o $(BUILD)/theme.o $(BUILD)/menu.o $(BUILD)/desktop.o $(BUILD)/notification.o $(BUILD)/clipboard.o $(BUILD)/reminder.o $(BUILD)/idle.o $(BUILD)/launcher.o $(BUILD)/privacy.o $(BUILD)/secure_memory.o $(BUILD)/task.o $(BUILD)/keyboard.o $(BUILD)/mouse.o $(BUILD)/kernel.o
 	grub-file --is-x86-multiboot $@
 $(BUILD)/breados.iso: $(BUILD)/kernel.elf grub.cfg
 	mkdir -p $(BUILD)/iso/boot/grub
@@ -109,6 +111,8 @@ $(BUILD)/launcher-host-test: tests/launcher-host.c launcher.c launcher.h | $(BUI
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/launcher-host.c launcher.c -o $@
 $(BUILD)/privacy-host-test: tests/privacy-host.c privacy.c privacy.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/privacy-host.c privacy.c -o $@
+$(BUILD)/elf-loader-host-test: tests/elf-loader-host.c elf_loader.c elf_loader.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/elf-loader-host.c elf_loader.c -o $@
 $(BUILD)/secure-memory-host-test: tests/secure-memory-host.c secure_memory.c secure_memory.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/secure-memory-host.c secure_memory.c -o $@
 $(BUILD)/video-host-test: tests/video-host.c video.c video.h paging.h | $(BUILD)
@@ -117,7 +121,8 @@ iso: $(BUILD)/breados.iso
 run: iso
 	test -f $(BUILD)/breados-disk.img || truncate -s 16M $(BUILD)/breados-disk.img
 	qemu-system-i386 -drive file=$(BUILD)/breados-disk.img,format=raw,if=ide,index=0 -cdrom $(BUILD)/breados.iso -serial stdio
-test: iso $(BUILD)/pci-host-test $(BUILD)/audio-host-test $(BUILD)/heap-host-test $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test $(BUILD)/theme-host-test $(BUILD)/menu-host-test $(BUILD)/notification-host-test $(BUILD)/clipboard-host-test $(BUILD)/reminder-host-test $(BUILD)/idle-host-test $(BUILD)/launcher-host-test $(BUILD)/privacy-host-test $(BUILD)/secure-memory-host-test
+test: iso $(BUILD)/elf-loader-host-test $(BUILD)/pci-host-test $(BUILD)/audio-host-test $(BUILD)/heap-host-test $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test $(BUILD)/theme-host-test $(BUILD)/menu-host-test $(BUILD)/notification-host-test $(BUILD)/clipboard-host-test $(BUILD)/reminder-host-test $(BUILD)/idle-host-test $(BUILD)/launcher-host-test $(BUILD)/privacy-host-test $(BUILD)/secure-memory-host-test
+	$(BUILD)/elf-loader-host-test
 	$(BUILD)/pci-host-test
 	$(BUILD)/audio-host-test
 	$(BUILD)/heap-host-test
