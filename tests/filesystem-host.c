@@ -154,6 +154,33 @@ static void test_duplicate_persistent_entries_are_rejected(void) {
     assert(pfs_ready()==0);
 }
 
+static void test_invalid_persistent_metadata_is_rejected(void) {
+    const size_t entry_size=FS_NAME_MAX+1u+sizeof(uint16_t)+2u;
+
+    make_valid_volume();
+    memset(disk[1],0,SECTOR_SIZE);
+    memcpy(disk[1],"bad",4);
+    disk[1][FS_NAME_MAX+1u+sizeof(uint16_t)]=1u;
+    disk[1][entry_size-1u]=3u; /* Unknown entry type. */
+    assert(pfs_init()==0);
+    assert(pfs_ready()==0);
+
+    make_valid_volume();
+    memset(disk[1],0,SECTOR_SIZE);
+    memcpy(disk[1],"bad name",9);
+    disk[1][FS_NAME_MAX+1u+sizeof(uint16_t)]=1u;
+    assert(pfs_init()==0);
+    assert(pfs_ready()==0);
+
+    make_valid_volume();
+    memset(disk[1],0,SECTOR_SIZE);
+    memcpy(disk[1],"docs//",7);
+    disk[1][FS_NAME_MAX+1u+sizeof(uint16_t)]=1u;
+    disk[1][entry_size-1u]=1u; /* Directory entry. */
+    assert(pfs_init()==0);
+    assert(pfs_ready()==0);
+}
+
 static void test_orphaned_persistent_child_is_rejected(void) {
     make_valid_volume();
     memset(disk[1],0,SECTOR_SIZE);
@@ -174,6 +201,7 @@ int main(void) {
     test_malformed_disk_name_is_rejected();
     test_persistent_binary_files();
     test_duplicate_persistent_entries_are_rejected();
+    test_invalid_persistent_metadata_is_rejected();
     test_orphaned_persistent_child_is_rejected();
     puts("Filesystem host regression tests passed.");
     return 0;
