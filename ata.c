@@ -25,6 +25,7 @@
 #define ATA_TIMEOUT    1000000u
 
 static int available;
+static int flush_supported;
 static uint32_t sectors;
 
 static inline void outb(uint16_t port, uint8_t value) {
@@ -73,6 +74,7 @@ static int wait_data_request(void) {
 }
 int ata_init(void) {
     available = 0;
+    flush_supported = 0;
     sectors = 0;
     outb(ATA_DRIVE, 0xA0u); /* primary channel, master, legacy mode */
     delay_400ns();
@@ -93,6 +95,9 @@ int ata_init(void) {
 
     /* Word 49 bit 9 advertises LBA support; CHS-only disks are unsupported. */
     if (!(identify[49] & (1u << 9))) return 0;
+    /* Word 83 feature bits are valid only when its validity field is 01b. */
+    flush_supported = ((identify[83] & 0xC000u) == 0x4000u) &&
+                      ((identify[83] & (1u << 12)) != 0);
     sectors = ((uint32_t)identify[61] << 16) | identify[60];
     if (sectors == 0) return 0;
     /* This driver emits 28-bit LBA commands, never address beyond that range. */
@@ -127,6 +132,7 @@ int ata_write_sector(uint32_t lba, const void *buffer) {
     const uint16_t *words = (const uint16_t *)buffer;
     for (uint32_t i = 0; i < 256; ++i) outw(ATA_DATA, words[i]);
     if (wait_not_busy(0) != 0) return -1;
+    if (!flush_supported) return 0;
     outb(ATA_COMMAND, ATA_FLUSH);
     return wait_not_busy(0);
 }
