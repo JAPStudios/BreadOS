@@ -2,7 +2,7 @@
 #define BREADOS_PAGING_H
 #include <stdint.h>
 
-/* Enables supervisor-only, writable identity mapping of the first 16 MiB. */
+/* Enables supervisor-only, writable identity mapping of the first 256 MiB. */
 void paging_init(void);
 
 /* Maps a physical framebuffer into a dedicated 4 MiB virtual window. */
