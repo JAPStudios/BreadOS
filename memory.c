@@ -4,8 +4,7 @@
 #define PAGE_SIZE 4096u
 #define FRAME_COUNT 1048576u /* Bitmap covers the 32-bit physical address space. */
 #define BITMAP_WORDS (FRAME_COUNT / 32u)
-/* paging.c currently identity-maps only the first 16 MiB. Until the direct
- * map is extended, never advertise or allocate frames outside that range. */
+/* Keep allocation within paging.c's supervisor identity map. */
 #define DIRECT_MAP_LIMIT (256u * 1024u * 1024u)
 #define DIRECT_MAP_FRAMES (DIRECT_MAP_LIMIT / PAGE_SIZE)
 #define ALLOCATION_BITMAP_WORDS (DIRECT_MAP_FRAMES / 32u)
