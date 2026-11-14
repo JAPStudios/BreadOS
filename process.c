@@ -166,7 +166,7 @@ int process_execute_elf(const void *bytes,size_t size) {
 
 int process_execute_file(const char *path) {
     static uint8_t executable[65535];
-    if (!path || !pfs_ready()) return -1;
+    if (process_execution_active || !path || !pfs_ready()) return -1;
     int size=pfs_read_binary(path,executable,sizeof(executable));
     if (size<=0) return -1;
     return process_execute_elf(executable,(size_t)size);
