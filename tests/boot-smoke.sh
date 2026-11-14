@@ -15,7 +15,7 @@ if [ "$status" -ne 124 ]; then
 fi
 grep -F "BreadOS kernel starting..." build/qemu-serial.log
 grep -F "Boot OK. VGA console and PS/2 keyboard shell ready." build/qemu-serial.log
-grep -F "Paging enabled: first 16 MiB identity-mapped." build/qemu-serial.log
+grep -F "Paging enabled: first 256 MiB identity-mapped." build/qemu-serial.log
 grep -F "Persistent BreadFS formatted and mounted." build/qemu-serial.log
 grep -F "bread>" build/qemu-serial.log
 grep -F "Scheduler smoke test passed: round-robin task switching verified." build/qemu-serial.log
