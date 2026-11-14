@@ -6,7 +6,7 @@
 #define BITMAP_WORDS (FRAME_COUNT / 32u)
 /* paging.c currently identity-maps only the first 16 MiB. Until the direct
  * map is extended, never advertise or allocate frames outside that range. */
-#define DIRECT_MAP_LIMIT (16u * 1024u * 1024u)
+#define DIRECT_MAP_LIMIT (256u * 1024u * 1024u)
 #define DIRECT_MAP_FRAMES (DIRECT_MAP_LIMIT / PAGE_SIZE)
 #define ALLOCATION_BITMAP_WORDS (DIRECT_MAP_FRAMES / 32u)
 #define MB_FLAG_MEMORY  (1u << 0)
