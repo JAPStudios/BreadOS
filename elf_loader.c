@@ -27,7 +27,12 @@ static int power_of_two(uint32_t value) {
 }
 static int read_load_segment(const struct elf32_image *image, uint16_t index,
                              struct elf32_load_segment *segment) {
-    if (!image || !image->bytes || !segment || index >= image->program_header_count)
+    if (!image || !image->bytes || !segment || image->size < ELF_HEADER_SIZE ||
+        index >= image->program_header_count ||
+        read16(image->bytes + 40) != ELF_HEADER_SIZE ||
+        read16(image->bytes + 42) != ELF_PROGRAM_HEADER_SIZE ||
+        !range_valid(image->size, read32(image->bytes + 28),
+                     (uint32_t)image->program_header_count * ELF_PROGRAM_HEADER_SIZE))
         return -1;
     const uint8_t *ph = image->bytes + read32(image->bytes + 28) +
                         (size_t)index * ELF_PROGRAM_HEADER_SIZE;
@@ -41,7 +46,12 @@ static int read_load_segment(const struct elf32_image *image, uint16_t index,
 }
 
 int elf32_inspect(const void *data, size_t size, struct elf32_image *image) {
-    if (!data || !image || size < ELF_HEADER_SIZE) return -1;
+    if (!image) return -1;
+    image->bytes = 0;
+    image->size = 0;
+    image->entry = 0;
+    image->program_header_count = 0;
+    if (!data || size < ELF_HEADER_SIZE) return -1;
     const uint8_t *b = (const uint8_t *)data;
     if (b[0] != 0x7F || b[1] != 'E' || b[2] != 'L' || b[3] != 'F' ||
         b[4] != 1 || b[5] != 1 || b[6] != 1 ||
