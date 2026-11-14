@@ -5,7 +5,7 @@
 
 #define PAGE_SIZE 4096u
 #define PAGE_ENTRIES 1024u
-#define IDENTITY_MAP_BYTES (16u * 1024u * 1024u)
+#define IDENTITY_MAP_BYTES (256u * 1024u * 1024u)
 #define PAGE_PRESENT 0x001u
 #define PAGE_WRITABLE 0x002u
 #define PAGE_USER 0x004u
