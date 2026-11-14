@@ -35,14 +35,14 @@ static void task_exit(void) {
 static void worker_a(void) {
     for (;;) {
         ++worker_a_ticks;
-        __asm__ volatile ("pause");
+        __asm__ volatile ("hlt" ::: "memory");
     }
 }
 
 static void worker_b(void) {
     for (;;) {
         ++worker_b_ticks;
-        __asm__ volatile ("pause");
+        __asm__ volatile ("hlt" ::: "memory");
     }
 }
 
