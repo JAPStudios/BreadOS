@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 /* Physical frames are 4 KiB. The current bootstrap page table identity-maps
- * only the first 16 MiB, so allocation/free operations are limited to that
+ * only the first 256 MiB, so allocation/free operations are limited to that
  * directly mapped region. Returned addresses are physical addresses.
  */
 void memory_init(uint32_t multiboot_info_address);
