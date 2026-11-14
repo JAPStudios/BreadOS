@@ -134,6 +134,30 @@ static int valid_entry(const struct pfs_entry *entry) {
     }
     return valid_path(entry->name);
 }
+static int same_entry_path(const struct pfs_entry *a,const struct pfs_entry *b) {
+    size_t an=string_length(a->name),bn=string_length(b->name);
+    if (a->reserved==1u && an) --an;
+    if (b->reserved==1u && bn) --bn;
+    if (an!=bn) return 0;
+    for (size_t i=0;i<an;i++) if (a->name[i]!=b->name[i]) return 0;
+    return 1;
+}
+static int valid_directory_tree(void) {
+    for (size_t i=0;i<FS_MAX_FILES;i++) {
+        if (!directory[i].used) continue;
+        for (size_t j=i+1u;j<FS_MAX_FILES;j++)
+            if (directory[j].used && same_entry_path(&directory[i],&directory[j]))
+                return 0;
+        char path[FS_NAME_MAX+1u];
+        size_t n=string_length(directory[i].name);
+        if (directory[i].reserved==1u) --n;
+        copy_bytes(path,directory[i].name,n);
+        path[n]=0;
+        if (!parent_exists(path)) return 0;
+    }
+    return 1;
+}
+
 int pfs_init(void) {
     ready = 0;
     zero_bytes(directory, sizeof(directory));
@@ -174,6 +198,10 @@ int pfs_init(void) {
             zero_bytes(directory, sizeof(directory));
             return 0;
         }
+    if (!valid_directory_tree()) {
+        zero_bytes(directory, sizeof(directory));
+        return 0;
+    }
     ready = 1;
     return 1;
 }
