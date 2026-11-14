@@ -35,7 +35,7 @@ $(BUILD)/paging.o: paging.c paging.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/elf_loader.o: elf_loader.c elf_loader.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
-$(BUILD)/process.o: process.c process.h memory.h paging.h syscall.h elf_loader.h | $(BUILD)
+$(BUILD)/process.o: process.c process.h memory.h paging.h syscall.h elf_loader.h pfs.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/syscall.o: syscall.c syscall.h video.h console.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -67,7 +67,7 @@ $(BUILD)/keyboard.o: kernel/keyboard.c kernel/keyboard.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/mouse.o: kernel/mouse.c kernel/mouse.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
-$(BUILD)/kernel.o: kernel.c audio.h memory.h privacy.h heap.h interrupts.h fs.h pfs.h paging.h video.h gdt.h task.h kernel/keyboard.h kernel/mouse.h process.h console.h theme.h menu.h desktop.h notification.h clipboard.h reminder.h | $(BUILD)
+$(BUILD)/kernel.o: kernel.c audio.h memory.h privacy.h heap.h interrupts.h fs.h pfs.h elf_loader.h paging.h video.h gdt.h task.h kernel/keyboard.h kernel/mouse.h process.h console.h theme.h menu.h desktop.h notification.h clipboard.h reminder.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/interrupts.o: interrupts.s | $(BUILD)
 	$(AS) --32 $< -o $@
