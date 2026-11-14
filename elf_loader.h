@@ -7,6 +7,7 @@
 #define ELF32_MAX_LOAD_SEGMENTS 32u
 #define ELF32_USER_START 0x40000000u
 #define ELF32_USER_END   0x40400000u
+#define ELF32_USER_STACK_PAGE (ELF32_USER_END - 4096u)
 
 struct elf32_image {
     const uint8_t *bytes;
