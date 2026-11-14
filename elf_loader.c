@@ -62,7 +62,7 @@ int elf32_inspect(const void *data, size_t size, struct elf32_image *image) {
 
     uint32_t phoff = read32(b + 28);
     uint16_t phnum = read16(b + 44);
-    if (!phnum || phnum > ELF32_MAX_LOAD_SEGMENTS ||
+    if (!phnum || phnum > ELF32_MAX_LOAD_SEGMENTS || phoff < ELF_HEADER_SIZE ||
         !range_valid(size, phoff, (uint32_t)phnum * ELF_PROGRAM_HEADER_SIZE))
         return -1;
 
