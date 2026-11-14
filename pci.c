@@ -24,17 +24,40 @@ static void scan_function(uint8_t bus,uint8_t dev,uint8_t fn){
     unsigned bars=(d->header_type&0x7Fu)==0u?6u:((d->header_type&0x7Fu)==1u?2u:1u);
     for(unsigned i=0;i<6u;i++)d->bars[i]=i<bars?config_read(bus,dev,fn,(uint8_t)(0x10u+i*4u)):0u;
 }
-void pci_init(void){
-    count=0;
-    for(uint32_t bus=0;bus<256u&&count<PCI_MAX_DEVICES;bus++)
-      for(uint32_t dev=0;dev<32u&&count<PCI_MAX_DEVICES;dev++){
-        uint32_t id=config_read((uint8_t)bus,(uint8_t)dev,0,0);
-        if((uint16_t)id==0xFFFFu)continue;
-        uint32_t hdr=config_read((uint8_t)bus,(uint8_t)dev,0,12);
-        scan_function((uint8_t)bus,(uint8_t)dev,0);
-        if(((hdr>>16)&0x80u)!=0u)
-          for(uint32_t fn=1;fn<8u&&count<PCI_MAX_DEVICES;fn++)scan_function((uint8_t)bus,(uint8_t)dev,(uint8_t)fn);
-      }
+static uint8_t scanned_buses[256];
+
+static void scan_bus(uint8_t bus) {
+    if (scanned_buses[bus] || count >= PCI_MAX_DEVICES) return;
+    scanned_buses[bus] = 1;
+
+    for (uint32_t dev = 0; dev < 32u && count < PCI_MAX_DEVICES; ++dev) {
+        uint32_t id = config_read(bus, (uint8_t)dev, 0, 0);
+        if ((uint16_t)id == 0xFFFFu) continue;
+
+        uint32_t header = config_read(bus, (uint8_t)dev, 0, 12);
+        unsigned functions = ((header >> 16) & 0x80u) ? 8u : 1u;
+        for (uint32_t fn = 0; fn < functions && count < PCI_MAX_DEVICES; ++fn) {
+            size_t before = count;
+            scan_function(bus, (uint8_t)dev, (uint8_t)fn);
+            if (count == before) continue;
+
+            const struct pci_device *device = &devices[count - 1u];
+            if (device->class_code == 0x06u && device->subclass == 0x04u) {
+                uint32_t buses = config_read(bus, (uint8_t)dev,
+                                             (uint8_t)fn, 0x18u);
+                uint8_t secondary = (uint8_t)(buses >> 8);
+                if (secondary != 0u && secondary != bus)
+                    scan_bus(secondary);
+            }
+        }
+    }
+}
+
+void pci_init(void) {
+    count = 0;
+    for (size_t i = 0; i < sizeof(scanned_buses); ++i)
+        scanned_buses[i] = 0;
+    scan_bus(0);
 }
 size_t pci_device_count(void){return count;}
 const struct pci_device *pci_device_at(size_t index){return index<count?&devices[index]:0;}
