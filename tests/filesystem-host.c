@@ -7,7 +7,7 @@
 #include "pfs.h"
 
 #define SECTOR_SIZE 512u
-#define SECTOR_COUNT 32u
+#define SECTOR_COUNT 4096u
 #define PFS_MAGIC 0x31534642u
 
 static uint8_t disk[SECTOR_COUNT][SECTOR_SIZE];
@@ -107,12 +107,37 @@ static void test_malformed_disk_name_is_rejected(void) {
     assert(pfs_ready() == 0);
 }
 
+
+static void test_persistent_binary_files(void) {
+    uint8_t source[1300], destination[1300];
+    for (size_t i=0;i<sizeof(source);i++) source[i]=(uint8_t)((i*37u)^0xA5u);
+    make_valid_volume();
+    memset(disk[1],0,SECTOR_SIZE);
+    assert(pfs_init()==1);
+    assert(pfs_write_binary("app.elf",source,sizeof(source))==(int)sizeof(source));
+    memset(destination,0,sizeof(destination));
+    assert(pfs_read_binary("app.elf",destination,sizeof(destination))==(int)sizeof(destination));
+    assert(memcmp(source,destination,sizeof(source))==0);
+    assert(pfs_read("app.elf",(char *)destination,sizeof(destination))==-1);
+    assert(pfs_init()==1);
+    memset(destination,0,sizeof(destination));
+    assert(pfs_read_binary("app.elf",destination,sizeof(destination))==(int)sizeof(destination));
+    assert(memcmp(source,destination,sizeof(source))==0);
+    assert(pfs_move("app.elf","renamed.elf")==0);
+    assert(pfs_read_binary("renamed.elf",destination,sizeof(destination))==(int)sizeof(destination));
+    assert(pfs_remove("renamed.elf")==0);
+    assert(pfs_read_binary("renamed.elf",destination,sizeof(destination))==-1);
+    assert(pfs_write_binary("too-large",source,65536u)==-1);
+    assert(pfs_write_binary("bad/name",source,sizeof(source))==-1);
+}
+
 int main(void) {
     test_ram_filesystem_null_arguments();
     test_persistent_filesystem_null_arguments();
     test_ram_directories_and_moves();
     test_persistent_directories_and_moves();
     test_malformed_disk_name_is_rejected();
+    test_persistent_binary_files();
     puts("Filesystem host regression tests passed.");
     return 0;
 }
