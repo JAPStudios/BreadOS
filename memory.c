@@ -69,7 +69,9 @@ void memory_init(uint32_t info_address) {
         uint64_t map_start = info->mmap_addr;
         uint64_t map_end = map_start + (uint64_t)info->mmap_length;
         /* Validate the entire untrusted map before making any RAM allocatable. */
-        int map_valid = map_end <= 0x100000000ULL &&
+        int map_valid = map_start < DIRECT_MAP_LIMIT &&
+                        map_end <= DIRECT_MAP_LIMIT &&
+                        map_end > map_start &&
                         info->mmap_length >= sizeof(uint32_t);
         while (map_valid && offset < info->mmap_length) {
             uint64_t entry_address = map_start + offset;
@@ -97,6 +99,17 @@ void memory_init(uint32_t info_address) {
                 uint64_t base = ((uint64_t)entry->base_high << 32) | entry->base_low;
                 uint64_t len = ((uint64_t)entry->length_high << 32) | entry->length_low;
                 if (entry->type == 1 && len) usable_range(base, len);
+                offset += (uint32_t)step;
+            }
+            /* Reserved entries take precedence if firmware ranges overlap. */
+            offset = 0;
+            while (offset < info->mmap_length) {
+                const struct mmap_entry *entry =
+                    (const struct mmap_entry *)(uintptr_t)(map_start + offset);
+                uint64_t step = (uint64_t)entry->size + sizeof(entry->size);
+                uint64_t base = ((uint64_t)entry->base_high << 32) | entry->base_low;
+                uint64_t len = ((uint64_t)entry->length_high << 32) | entry->length_low;
+                if (entry->type != 1 && len) reserve_range(base, len);
                 offset += (uint32_t)step;
             }
         }
