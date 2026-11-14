@@ -90,8 +90,13 @@ int ata_init(void) {
 
     uint16_t identify[256];
     for (uint32_t i = 0; i < 256; ++i) identify[i] = inw(ATA_DATA);
+
+    /* Word 49 bit 9 advertises LBA support; CHS-only disks are unsupported. */
+    if (!(identify[49] & (1u << 9))) return 0;
     sectors = ((uint32_t)identify[61] << 16) | identify[60];
     if (sectors == 0) return 0;
+    /* This driver emits 28-bit LBA commands, never address beyond that range. */
+    if (sectors > ATA_LBA28_MAX) sectors = ATA_LBA28_MAX;
     available = 1;
     return 1;
 }
