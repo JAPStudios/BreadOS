@@ -66,15 +66,22 @@ void memory_init(uint32_t info_address) {
         (const struct multiboot_info *)(uintptr_t)info_address;
     if (info && (info->flags & MB_FLAG_MMAP) && info->mmap_length) {
         uint32_t offset = 0;
-        while (offset + sizeof(uint32_t) <= info->mmap_length) {
-            const struct mmap_entry *entry =
-                (const struct mmap_entry *)(uintptr_t)(info->mmap_addr + offset);
-            uint32_t step = entry->size + sizeof(entry->size);
-            if (step < sizeof(*entry) || step > info->mmap_length - offset) break;
-            uint64_t base = ((uint64_t)entry->base_high << 32) | entry->base_low;
-            uint64_t len = ((uint64_t)entry->length_high << 32) | entry->length_low;
-            if (entry->type == 1 && len) usable_range(base, len);
-            offset += step;
+        uint64_t map_start = info->mmap_addr;
+        uint64_t map_end = map_start + (uint64_t)info->mmap_length;
+        /* Multiboot pointers are 32-bit; reject a wrapped map before dereference. */
+        if (map_end <= 0x100000000ULL && info->mmap_length >= sizeof(uint32_t)) {
+            while ((uint64_t)offset + sizeof(uint32_t) <= info->mmap_length) {
+                uint64_t entry_address = map_start + offset;
+                if (entry_address + sizeof(uint32_t) > map_end) break;
+                const struct mmap_entry *entry =
+                    (const struct mmap_entry *)(uintptr_t)entry_address;
+                uint64_t step = (uint64_t)entry->size + sizeof(entry->size);
+                if (step < sizeof(*entry) || step > map_end - entry_address) break;
+                uint64_t base = ((uint64_t)entry->base_high << 32) | entry->base_low;
+                uint64_t len = ((uint64_t)entry->length_high << 32) | entry->length_low;
+                if (entry->type == 1 && len) usable_range(base, len);
+                offset += (uint32_t)step;
+            }
         }
         reserve_range(info_address, sizeof(*info));
         reserve_range(info->mmap_addr, info->mmap_length);
