@@ -179,6 +179,19 @@ static void test_invalid_persistent_metadata_is_rejected(void) {
     disk[1][entry_size-1u]=1u; /* Directory entry. */
     assert(pfs_init()==0);
     assert(pfs_ready()==0);
+
+    /* Unused slots must be completely zeroed, not carry stale metadata. */
+    make_valid_volume();
+    memset(disk[1],0,SECTOR_SIZE);
+    disk[1][0]='x';
+    assert(pfs_init()==0);
+    assert(pfs_ready()==0);
+
+    make_valid_volume();
+    memset(disk[1],0,SECTOR_SIZE);
+    disk[1][entry_size-1u]=1u;
+    assert(pfs_init()==0);
+    assert(pfs_ready()==0);
 }
 
 static void test_orphaned_persistent_child_is_rejected(void) {
