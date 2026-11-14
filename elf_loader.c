@@ -90,7 +90,7 @@ int elf32_inspect(const void *data, size_t size, struct elf32_image *image) {
         if (!seg.memory_size || seg.file_size > seg.memory_size ||
             !range_valid(size, seg.offset, seg.file_size) ||
             seg.virtual_address < ELF32_USER_START ||
-            (uint64_t)seg.virtual_address + seg.memory_size > ELF32_USER_END ||
+            (uint64_t)seg.virtual_address + seg.memory_size > ELF32_USER_STACK_PAGE ||
             (seg.virtual_address & (ELF_PAGE_SIZE - 1u)) ||
             (seg.offset & (ELF_PAGE_SIZE - 1u)) ||
             !(seg.flags & ELF_PF_R) ||
