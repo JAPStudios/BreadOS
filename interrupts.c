@@ -126,7 +126,10 @@ static void fatal_exception(uint32_t vector, uint32_t error_code) {
     for (;;) __asm__ volatile ("hlt");
 }
 uint32_t *interrupt_handler(uint32_t vector, uint32_t error_code, uint32_t *frame) {
-    if (vector < 32) fatal_exception(vector, error_code);
+    if (vector < 32) {
+        if (syscall_abort_user_exception(frame, vector, error_code)) return frame;
+        fatal_exception(vector, error_code);
+    }
     if (vector == 32) {
         ticks++;
         outb(PIC1_COMMAND, 0x20);
