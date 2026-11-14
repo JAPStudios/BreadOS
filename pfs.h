@@ -12,6 +12,9 @@ int pfs_ready(void);
 size_t pfs_count(void);
 const char *pfs_name(size_t index);
 int pfs_read(const char *path, char *out, size_t capacity);
+/* Binary files occupy a private 64 KiB extent per directory slot. */
+int pfs_read_binary(const char *path, void *out, size_t capacity);
+int pfs_write_binary(const char *path, const void *data, size_t size);
 int pfs_write(const char *path, const char *data);
 int pfs_remove(const char *path);
 int pfs_mkdir(const char *path);
