@@ -110,4 +110,4 @@ void memory_free_frame(uint32_t address) {
     mark_free(frame);
 }
 uint32_t memory_free_frames(void) { return free_count; }
-uint32_t memory_total_frames(void) { return FRAME_COUNT; }
+uint32_t memory_total_frames(void) { return DIRECT_MAP_FRAMES; }
