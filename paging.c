@@ -69,7 +69,8 @@ void *paging_map_framebuffer(uint64_t physical_address, uint32_t length) {
 }
 
 int paging_address_space_create(struct paging_address_space *space) {
-    if (!paging_enabled || !space) return -1;
+    if (!paging_enabled || !space || space->directory_physical ||
+        space->user_table_physical) return -1;
     space->directory_physical = 0;
     space->user_table_physical = 0;
 
@@ -111,7 +112,7 @@ int paging_address_space_map_user_page(struct paging_address_space *space,
     if (!paging_enabled || !space || !space->directory_physical ||
         !space->user_table_physical ||
         (virtual_address & (PAGE_SIZE - 1u)) ||
-        (physical_address & (PAGE_SIZE - 1u)) ||
+        (physical_address & (PAGE_SIZE - 1u)) || physical_address == 0 ||
         virtual_address < USER_REGION_START || virtual_address >= USER_REGION_END ||
         physical_address >= IDENTITY_MAP_BYTES ||
         (writable != 0 && writable != 1))
