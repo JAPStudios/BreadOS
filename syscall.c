@@ -35,4 +35,24 @@ void syscall_dispatch(uint32_t *saved_frame) {
     frame->eax=0xFFFFFFFFu;
 }
 
+int syscall_abort_user_exception(uint32_t *saved_frame, uint32_t vector,
+                                 uint32_t error_code) {
+    (void)error_code;
+    if (!saved_frame || vector >= 32u || vector == 2u ||
+        vector == 8u || vector == 18u)
+        return 0;
+
+    struct syscall_frame *frame=(struct syscall_frame *)(void *)saved_frame;
+    if ((frame->cs & 3u) != 3u) return 0;
+
+    /* Keep ordinary user faults from taking down the kernel. Double faults,
+       NMIs and machine checks remain fatal because their recovery is unsafe. */
+    last_exit_code=-(int)(vector+1u);
+    frame->eax=(uint32_t)last_exit_code;
+    frame->eip=(uint32_t)(uintptr_t)user_exit_trampoline;
+    frame->cs=KERNEL_CODE_SELECTOR;
+    frame->eflags=0x202u;
+    return 1;
+}
+
 int syscall_last_exit_code(void) { return last_exit_code; }
