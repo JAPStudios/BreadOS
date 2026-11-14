@@ -36,6 +36,19 @@ int main(void) {
     make_image();put32(76,7);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
     make_image();put32(24,ELF32_USER_START+0x1000);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
     make_image();put32(28,0xFFFFFFF0);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    /* Program headers must not alias the ELF file header. */
+    make_image();put32(28,40);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    /* p_align must be a power of two and satisfy p_vaddr/p_offset congruence. */
+    make_image();put32(80,3);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    make_image();put32(80,8192);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    /* Dynamic linking and interpreter segments are deliberately unsupported. */
+    make_image();put32(52,2);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    make_image();put32(52,3);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    /* Two load segments may not map overlapping user virtual ranges. */
+    make_image();put16(44,2);
+    put32(84,1);put32(88,4096);put32(92,ELF32_USER_START);
+    put32(100,1);put32(104,4096);put32(108,4);put32(112,4096);
+    assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
     puts("ELF loader validation tests passed");
     return 0;
 }
