@@ -10,6 +10,6 @@ void memory_init(uint32_t multiboot_info_address);
 uint32_t memory_alloc_frame(void); /* returns 0 when mapped frames are exhausted */
 void memory_free_frame(uint32_t physical_address);
 uint32_t memory_free_frames(void); /* free frames currently eligible for allocation */
-uint32_t memory_total_frames(void); /* bitmap capacity: 4 GiB / 4 KiB */
+uint32_t memory_total_frames(void); /* frames currently addressable by the allocator */
 
 #endif
