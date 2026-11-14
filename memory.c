@@ -62,6 +62,14 @@ void memory_init(uint32_t info_address) {
     scan_hint = 256u;
     for (uint32_t i = 0; i < ALLOCATION_BITMAP_WORDS; ++i)
         allocated_bitmap[i] = 0;
+    /* The boot-information structure itself must be safely readable
+       through the current supervisor identity map before any field access. */
+    if (info_address >= DIRECT_MAP_LIMIT ||
+        sizeof(struct multiboot_info) > DIRECT_MAP_LIMIT - info_address) {
+        reserve_range(0, 0x100000ULL);
+        reserve_range(0, (uint64_t)(uintptr_t)kernel_end);
+        return;
+    }
     const struct multiboot_info *info =
         (const struct multiboot_info *)(uintptr_t)info_address;
     if (info && (info->flags & MB_FLAG_MMAP) && info->mmap_length) {
