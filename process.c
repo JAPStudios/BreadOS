@@ -3,6 +3,7 @@
 #include "paging.h"
 #include "syscall.h"
 #include "elf_loader.h"
+#include "pfs.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -149,4 +150,13 @@ int process_execute_elf(const void *bytes,size_t size) {
     int exit_code=syscall_last_exit_code();
     process_release_pages(&space);
     return exit_code;
+}
+
+
+int process_execute_file(const char *path) {
+    static uint8_t executable[65535];
+    if (!path || !pfs_ready()) return -1;
+    int size=pfs_read_binary(path,executable,sizeof(executable));
+    if (size<=0) return -1;
+    return process_execute_elf(executable,(size_t)size);
 }
