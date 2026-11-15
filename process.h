@@ -11,6 +11,6 @@ int process_execute_file(const char *path);
 /* Reclaim exited processes only after the scheduler has switched away from them. */
 void process_reap_zombies(void);
 uint32_t process_active_count(void);
-int process_task_at(uint32_t index,uint32_t *task_id,int *exiting);
+uint32_t process_snapshot(uint32_t *task_ids,uint8_t *exiting,uint32_t capacity);
 
 #endif
