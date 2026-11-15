@@ -52,6 +52,7 @@ int main(void) {
     assert(active_directory == user_space.directory_physical);
     assert(task_set_address_space(0) == 0);
     assert(task_switch_count() == 6);
+    assert(kernel_switches == 4);
 
     /* A null frame is rejected without advancing scheduler state. */
     assert(task_schedule(0) == 0);
