@@ -260,7 +260,7 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     pci_init();puts("PCI configuration-space scan complete.\\n");
     if(video_init(mbi)==0){theme_apply(theme_current()->name);puts("GRUB RGB framebuffer mapped; native graphical text console initialized.\n");}else puts("No supported GRUB RGB framebuffer; VGA text fallback active.\n");
     int storage=pfs_init();if(storage==2)puts("Persistent BreadFS formatted and mounted.\n");else if(storage==1)puts("Persistent BreadFS mounted.\n");else{fs_init();if(storage==0)puts("RAM filesystem initialized (no usable ATA volume).\n");else puts("RAM filesystem initialized (ATA volume not recognized; disk left unchanged).\n");}
-    vfs_init();puts("Native VFS mounted at / with /dev and /proc.\\n");
+    vfs_init();puts("Native VFS mounted at / with /dev and /proc.\n");
     tasking_init();puts("Round-robin kernel scheduler initialized (3 kernel threads).\n");
     if(keyboard_init()==0)puts("PS/2 keyboard IRQ1 configured.\n");else puts("PS/2 keyboard IRQ1 unavailable; polling fallback enabled.\n");
     if(mouse_init(video_available()?video_width():640u,video_available()?video_height():480u)==0)puts("PS/2 mouse IRQ12 configured.\n");else puts("PS/2 mouse unavailable.\n");
