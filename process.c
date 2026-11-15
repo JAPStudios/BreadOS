@@ -10,6 +10,7 @@
 #define PAGE_SIZE 4096u
 #define PROCESS_CAPACITY (TASK_MAX - TASK_KERNEL_COUNT)
 #define PROCESS_MAX_USER_PAGES 1024u
+#define PROCESS_FD_MAX 4u
 #define USER_CODE_SELECTOR 0x1Bu
 #define USER_DATA_SELECTOR 0x23u
 #define USER_INITIAL_EFLAGS 0x202u
@@ -24,6 +25,7 @@ struct process_record {
     uint32_t kernel_stack_frame;
     struct paging_address_space address_space;
     uint32_t page_count;
+    int file_descriptors[PROCESS_FD_MAX];
     struct process_page pages[PROCESS_MAX_USER_PAGES];
 };
 
@@ -52,6 +54,7 @@ static struct process_record *process_reserve(void) {
             p->address_space.directory_physical=0;
             p->address_space.user_table_physical=0;
             p->page_count=0;
+            for(uint32_t fd=0;fd<PROCESS_FD_MAX;fd++)p->file_descriptors[fd]=-1;
             __asm__ volatile ("" : : : "memory");
             p->used=1;
             return p;
@@ -62,6 +65,12 @@ static struct process_record *process_reserve(void) {
 
 static void process_release_resources(struct process_record *p) {
     if (!p) return;
+    for(uint32_t fd=0;fd<PROCESS_FD_MAX;fd++) {
+        if(p->file_descriptors[fd]>=0) {
+            (void)vfs_close(p->file_descriptors[fd]);
+            p->file_descriptors[fd]=-1;
+        }
+    }
     if (p->address_space.directory_physical)
         paging_address_space_destroy(&p->address_space);
     for (uint32_t i=0;i<p->page_count;i++)
@@ -166,12 +175,11 @@ static int process_spawn_elf_inner(const void *bytes,size_t size) {
     uint32_t stack_top=p->kernel_stack_frame+PAGE_SIZE;
     uint32_t *initial_frame=process_initial_frame(
         stack_top,image.entry,ELF32_USER_STACK_PAGE+PAGE_SIZE-16u);
-    int task_id=task_create_user(initial_frame,&p->address_space,stack_top);
+    int task_id=task_create_user_ex(initial_frame,&p->address_space,stack_top,&p->task_id);
     if (task_id<0) {
         process_release_resources(p);
         return -1;
     }
-    p->task_id=(uint32_t)task_id;
     return task_id;
 }
 
@@ -255,4 +263,49 @@ uint32_t process_snapshot(uint32_t *task_ids,uint8_t *exiting,uint32_t capacity)
     }
     __asm__ volatile ("pushl %0; popfl" : : "r"(flags) : "memory","cc");
     return count;
+}
+
+static struct process_record *process_current_record(void) {
+    uint32_t id=task_current_id();
+    for(uint32_t i=0;i<PROCESS_CAPACITY;i++)
+        if(processes[i].used && processes[i].task_id==id) return &processes[i];
+    return 0;
+}
+int process_file_open(const char *path,uint32_t flags) {
+    struct process_record *p=process_current_record();
+    if(!p || !path)return -1;
+    for(uint32_t i=0;i<PROCESS_FD_MAX;i++) {
+        if(p->file_descriptors[i]>=0)continue;
+        int handle=vfs_open(path,flags);
+        if(handle<0)return -1;
+        p->file_descriptors[i]=handle;
+        return (int)i;
+    }
+    return -1;
+}
+static int process_vfs_handle(int descriptor) {
+    struct process_record *p=process_current_record();
+    if(!p || descriptor<0 || (uint32_t)descriptor>=PROCESS_FD_MAX)
+        return -1;
+    return p->file_descriptors[descriptor];
+}
+int process_file_read(int descriptor,void *buffer,uint32_t count) {
+    int handle=process_vfs_handle(descriptor);
+    return handle<0?-1:vfs_read(handle,buffer,count);
+}
+int process_file_write(int descriptor,const void *buffer,uint32_t count) {
+    int handle=process_vfs_handle(descriptor);
+    return handle<0?-1:vfs_write(handle,buffer,count);
+}
+int process_file_seek(int descriptor,int32_t offset,int whence) {
+    int handle=process_vfs_handle(descriptor);
+    return handle<0?-1:vfs_seek(handle,offset,whence);
+}
+int process_file_close(int descriptor) {
+    struct process_record *p=process_current_record();
+    if(!p || descriptor<0 || (uint32_t)descriptor>=PROCESS_FD_MAX ||
+       p->file_descriptors[descriptor]<0)return -1;
+    int handle=p->file_descriptors[descriptor];
+    p->file_descriptors[descriptor]=-1;
+    return vfs_close(handle);
 }
