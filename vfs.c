@@ -175,6 +175,18 @@ static int backend_exists(enum vfs_backend backend,const char *path,int *is_dire
     }
     return 0;
 }
+static int backend_parent_exists(enum vfs_backend backend,const char *path) {
+    size_t n=str_len(path);
+    for(size_t i=0;i<n;i++) {
+        if(path[i]!='/') continue;
+        char parent[FS_NAME_MAX+1u];
+        if(i>=FS_NAME_MAX)return 0;
+        bytes_copy(parent,path,i);parent[i]=0;
+        int is_directory=0;
+        if(!backend_exists(backend,parent,&is_directory) || !is_directory)return 0;
+    }
+    return 1;
+}
 static int backend_read_binary(enum vfs_backend backend,const char *path,
                                void *out,size_t capacity) {
     if (backend!=VFS_BACKEND_BREADFS) return -1;
@@ -277,8 +289,10 @@ int vfs_open(const char *path,uint32_t flags) {
         h->used=1;
         return slot;
     }
+    if(str_len(relative)>FS_NAME_MAX)return -1;
     int is_directory=0;
     int exists=backend_exists(backend,relative,&is_directory);
+    if(!exists && (flags&VFS_O_CREATE) && !backend_parent_exists(backend,relative))return -1;
     if(is_directory) return -1;
     if(flags&VFS_O_BINARY) {
         if(backend!=VFS_BACKEND_BREADFS) return -1;
