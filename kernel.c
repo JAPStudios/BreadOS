@@ -9,6 +9,7 @@
 #include "paging.h"
 #include "video.h"
 #include "pfs.h"
+#include "vfs.h"
 #include "gdt.h"
 #include "task.h"
 #include "kernel/keyboard.h"
@@ -72,14 +73,26 @@ static int parse_u32(const char *text,uint32_t *out) {
 }
 static void hex32(uint32_t value){static const char d[]="0123456789ABCDEF";for(int s=28;s>=0;s-=4)put(d[(value>>s)&15u]);}
 static void prompt(void){puts("bread> ");}
-static size_t file_count(void){return pfs_ready()?pfs_count():fs_count();}
-static const char *file_name(size_t i){return pfs_ready()?pfs_name(i):fs_name(i);}
-static int file_read(const char *name,char *out,size_t capacity){return pfs_ready()?pfs_read(name,out,capacity):fs_read(name,out,capacity);}
-static int file_write(const char *name,const char *data){return pfs_ready()?pfs_write(name,data):fs_write(name,data);}
-static int file_remove(const char *name){return pfs_ready()?pfs_remove(name):fs_remove(name);}
-static int file_mkdir(const char *path){return pfs_ready()?pfs_mkdir(path):fs_mkdir(path);}
-static int file_rmdir(const char *path){return pfs_ready()?pfs_rmdir(path):fs_rmdir(path);}
-static int file_move(const char *source,const char *destination){return pfs_ready()?pfs_move(source,destination):fs_move(source,destination);}
+static size_t file_count(void){
+    size_t count=0;struct vfs_dirent entry;
+    while(vfs_readdir("/",count,&entry)==0)++count;
+    return count;
+}
+static const char *file_name(size_t index){
+    static char name[VFS_PATH_MAX+1u];struct vfs_dirent entry;
+    if(vfs_readdir("/",index,&entry)<0)return 0;
+    size_t i=0;while(entry.name[i] && i<sizeof(name)-1u){name[i]=entry.name[i];++i;}
+    name[i]=0;return name;
+}
+static int file_read(const char *name,char *out,size_t capacity){if(!out||!capacity)return -1;int n=vfs_read_all(name,out,capacity-1u,0);if(n>=0)out[n]=0;return n;}
+static int file_write(const char *name,const char *data){
+    size_t n=0;while(data[n])++n;
+    return vfs_write_all(name,data,n,0);
+}
+static int file_remove(const char *path){return vfs_unlink(path);}
+static int file_mkdir(const char *path){return vfs_mkdir(path);}
+static int file_rmdir(const char *path){return vfs_rmdir(path);}
+static int file_move(const char *source,const char *destination){return vfs_rename(source,destination);}
 size_t bread_file_count(void){return file_count();}
 const char *bread_file_name(size_t index){return file_name(index);}
 int bread_file_read(const char *name,char *out,size_t capacity){return file_read(name,out,capacity);}
@@ -93,7 +106,7 @@ static void command(void){
     while(*end && *end!=' ')++end;
     char *rest=end;
     if(*end){*end++=0;while(*end==' ')++end;rest=end;}else rest=end;
-    if(eq(arg,"help"))puts("Commands: help, menu [SEARCH], history, theme [NAME], desktop, notify TEXT, notifications, snooze INDEX TICKS, dismiss INDEX, dnd [on|off], clipboard, remind TICKS TEXT, reminders, privacy [list|CAPABILITY on|off], heapcheck, pci, beep FREQUENCY [DURATION_TICKS], about, video, userdemo, exec PATH, memory, storage, uptime, tasks, ps, ls, mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
+    if(eq(arg,"help"))puts("Commands: help, menu [SEARCH], history, theme [NAME], desktop, notify TEXT, notifications, snooze INDEX TICKS, dismiss INDEX, dnd [on|off], clipboard, remind TICKS TEXT, reminders, privacy [list|CAPABILITY on|off], heapcheck, pci, beep FREQUENCY [DURATION_TICKS], about, video, userdemo, exec PATH, memory, storage, uptime, tasks, ps, ls [PATH], mkdir PATH, rmdir PATH, cat PATH, write PATH TEXT, mv SOURCE DEST, rm PATH, clear, reboot, halt\n");
     else if(eq(arg,"menu")){size_t shown=0;puts("BreadOS command palette\n");for(size_t i=0;i<shell_menu_count();i++){const struct shell_menu_entry *entry=shell_menu_at(i);if(shell_menu_matches(entry,rest)){puts("[");puts(entry->category);puts("] ");puts(entry->command);puts(" - ");puts(entry->description);puts("\n");shown++;}}if(!shown)puts("No matching commands.\n");}
     else if(eq(arg,"history")){uint32_t start=(history_head+HISTORY_CAPACITY-history_count)%HISTORY_CAPACITY;for(uint32_t i=0;i<history_count;i++){uint32_t slot=(start+i)%HISTORY_CAPACITY;hex32(i+1u);puts("  ");puts(command_history[slot]);puts("\n");}}
     else if(eq(arg,"theme")){if(!*rest){puts("Current theme: ");puts(theme_current()->name);puts("\nAvailable themes: ");for(size_t i=0;i<theme_count();i++){if(i)puts(", ");puts(theme_at(i)->name);}puts("\n");}else if(theme_apply(rest)==0){clear();if(file_write("theme",theme_current()->name)>=0){puts("Theme applied and saved: ");puts(theme_current()->name);puts("\n");}else puts("Theme applied, but could not be saved to storage.\n");}else puts("Unknown theme. Run theme to list available themes.\n");}
@@ -222,7 +235,7 @@ static void command(void){
     else if(eq(arg,"uptime")){puts("PIT ticks at 100 Hz: ");hex32(timer_ticks());puts("\n");}
     else if(eq(arg,"tasks")){puts("Timer-driven task switches: ");hex32(task_switch_count());puts("\nActive user processes: ");hex32(process_active_count());puts("\n");}
     else if(eq(arg,"ps")){uint32_t ids[TASK_MAX];uint8_t states[TASK_MAX];uint32_t count=process_snapshot(ids,states,TASK_MAX);puts("PID STATE\n");for(uint32_t i=0;i<count;i++){hex32(ids[i]);puts(states[i]?" exiting\n":" running\n");}}
-    else if(eq(arg,"ls")){for(size_t i=0;i<file_count();++i){const char *name=file_name(i);if(name){puts(name);puts("\n");}}}
+    else if(eq(arg,"ls")){const char *path=*rest?rest:"/";struct vfs_dirent entry;for(size_t i=0;vfs_readdir(path,i,&entry)==0;i++){puts(entry.name);if(entry.type==VFS_NODE_DIRECTORY)put('/');puts("\n");}}
     else if(eq(arg,"cat")){char content[FS_DATA_MAX+1u];if(!*rest)puts("Usage: cat NAME\n");else if(file_read(rest,content,sizeof(content))<0)puts("File not found.\n");else {puts(content);if(content[0]){size_t k=0;while(content[k])++k;if(content[k-1]!='\n')puts("\n");}}}
     else if(eq(arg,"write")){char *name=rest;while(*rest && *rest!=' ')++rest;if(*rest){*rest++=0;while(*rest==' ')++rest;if(!*rest)puts("Usage: write NAME TEXT\n");else {int result=file_write(name,rest);if(result>=0){if(pfs_ready())puts("File written to disk.\n");else puts("File written to RAM.\n");}else if(result==-2)puts("Error: file content limit is 255 bytes.\n");else if(result==-3)puts("Error: RAM filesystem is full.\n");else puts("Invalid filename. Use letters, numbers, dot, dash, underscore.\n");}}else puts("Usage: write NAME TEXT\n");}
     else if(eq(arg,"mkdir")){if(!*rest)puts("Usage: mkdir PATH\n");else if(file_mkdir(rest)==0)puts("Directory created.\n");else puts("Cannot create directory (invalid path, existing path, missing parent, or full filesystem).\n");}
@@ -247,6 +260,7 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     pci_init();puts("PCI configuration-space scan complete.\\n");
     if(video_init(mbi)==0){theme_apply(theme_current()->name);puts("GRUB RGB framebuffer mapped; native graphical text console initialized.\n");}else puts("No supported GRUB RGB framebuffer; VGA text fallback active.\n");
     int storage=pfs_init();if(storage==2)puts("Persistent BreadFS formatted and mounted.\n");else if(storage==1)puts("Persistent BreadFS mounted.\n");else{fs_init();if(storage==0)puts("RAM filesystem initialized (no usable ATA volume).\n");else puts("RAM filesystem initialized (ATA volume not recognized; disk left unchanged).\n");}
+    vfs_init();puts("Native VFS mounted at / with /dev and /proc.\n");
     tasking_init();puts("Round-robin kernel scheduler initialized (3 kernel threads).\n");
     if(keyboard_init()==0)puts("PS/2 keyboard IRQ1 configured.\n");else puts("PS/2 keyboard IRQ1 unavailable; polling fallback enabled.\n");
     if(mouse_init(video_available()?video_width():640u,video_available()?video_height():480u)==0)puts("PS/2 mouse IRQ12 configured.\n");else puts("PS/2 mouse unavailable.\n");
