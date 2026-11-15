@@ -97,6 +97,8 @@ $(BUILD)/keyboard-host-test: tests/keyboard-host.c kernel/keyboard.c kernel/keyb
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/keyboard-host.c kernel/keyboard.c -o $@
 $(BUILD)/task-host-test: tests/task-host.c task.c task.h paging.h ipc.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/task-host.c task.c -o $@
+$(BUILD)/vfs-host-test: tests/vfs-host.c vfs.c fs.c vfs.h fs.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/vfs-host.c vfs.c fs.c -o $@
 $(BUILD)/ipc-host-test: tests/ipc-host.c ipc.c ipc.h task.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/ipc-host.c ipc.c -o $@
 $(BUILD)/mouse-host-test: tests/mouse-host.c kernel/mouse.c kernel/mouse.h | $(BUILD)
@@ -127,7 +129,7 @@ iso: $(BUILD)/breados.iso
 run: iso
 	test -f $(BUILD)/breados-disk.img || truncate -s 16M $(BUILD)/breados-disk.img
 	qemu-system-i386 -drive file=$(BUILD)/breados-disk.img,format=raw,if=ide,index=0 -cdrom $(BUILD)/breados.iso -serial stdio
-test: iso $(BUILD)/elf-loader-host-test $(BUILD)/pci-host-test $(BUILD)/audio-host-test $(BUILD)/heap-host-test $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/ipc-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test $(BUILD)/theme-host-test $(BUILD)/menu-host-test $(BUILD)/notification-host-test $(BUILD)/clipboard-host-test $(BUILD)/reminder-host-test $(BUILD)/idle-host-test $(BUILD)/launcher-host-test $(BUILD)/privacy-host-test $(BUILD)/secure-memory-host-test
+test: iso $(BUILD)/elf-loader-host-test $(BUILD)/pci-host-test $(BUILD)/audio-host-test $(BUILD)/heap-host-test $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/ipc-host-test $(BUILD)/vfs-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test $(BUILD)/theme-host-test $(BUILD)/menu-host-test $(BUILD)/notification-host-test $(BUILD)/clipboard-host-test $(BUILD)/reminder-host-test $(BUILD)/idle-host-test $(BUILD)/launcher-host-test $(BUILD)/privacy-host-test $(BUILD)/secure-memory-host-test
 	$(BUILD)/elf-loader-host-test
 	$(BUILD)/pci-host-test
 	$(BUILD)/audio-host-test
@@ -136,6 +138,7 @@ test: iso $(BUILD)/elf-loader-host-test $(BUILD)/pci-host-test $(BUILD)/audio-ho
 	$(BUILD)/keyboard-host-test
 	$(BUILD)/task-host-test
 	$(BUILD)/ipc-host-test
+	$(BUILD)/vfs-host-test
 	$(BUILD)/video-host-test
 	$(BUILD)/mouse-host-test
 	$(BUILD)/theme-host-test
