@@ -14,5 +14,6 @@ int ipc_receive(uint32_t receiver, void *data, uint32_t capacity,
 
 /* Clear queued messages when a task slot is created or reclaimed. */
 void ipc_reset_task(uint32_t task_id);
+void ipc_remove_sender(uint32_t task_id);
 
 #endif
