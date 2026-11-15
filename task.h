@@ -21,6 +21,9 @@ int task_set_address_space(const struct paging_address_space *space);
 int task_create_user(uint32_t *initial_frame,
                      const struct paging_address_space *space,
                      uint32_t kernel_stack_top);
+int task_create_user_ex(uint32_t *initial_frame,
+                        const struct paging_address_space *space,
+                        uint32_t kernel_stack_top,uint32_t *task_id_out);
 
 /* Mark the current user task for deferred cleanup after another address space is active. */
 int task_terminate_current(int exit_code);
