@@ -294,6 +294,7 @@ int vfs_open(const char *path,uint32_t flags) {
         h->size=(uint32_t)size;
         bytes_copy(h->data,text,(size_t)size);
     } else if(!(flags&VFS_O_CREATE)) return -1;
+    if(!exists && (flags&VFS_O_CREATE)) h->dirty=1;
     if(flags&VFS_O_TRUNCATE) { h->size=0; h->dirty=1; }
     h->used=1;
     return slot;
