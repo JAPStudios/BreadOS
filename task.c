@@ -1,6 +1,7 @@
 #include "task.h"
 #include "paging.h"
 #include "gdt.h"
+#include "ipc.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -117,6 +118,7 @@ int task_create_user(uint32_t *initial_frame,
         tasks[i].address_space = *space;
         tasks[i].kernel_stack_top = kernel_stack_top;
         tasks[i].exit_code = 0;
+        ipc_reset_task(i);
         /* Publish the runnable state only after the complete context is ready. */
         __asm__ volatile ("" : : : "memory");
         tasks[i].state = TASK_RUNNABLE;
@@ -139,6 +141,18 @@ int task_is_zombie(uint32_t task_id) {
     return task_id < TASK_MAX && tasks[task_id].state == TASK_ZOMBIE;
 }
 
+int task_is_runnable(uint32_t task_id) {
+    return task_id < TASK_MAX && tasks[task_id].state == TASK_RUNNABLE;
+}
+
+const struct paging_address_space *task_current_address_space(void) {
+    if (current_task < TASK_KERNEL_COUNT ||
+        tasks[current_task].state != TASK_RUNNABLE ||
+        !tasks[current_task].address_space.directory_physical)
+        return 0;
+    return &tasks[current_task].address_space;
+}
+
 int task_exit_code(uint32_t task_id) {
     if (task_id >= TASK_MAX || tasks[task_id].state != TASK_ZOMBIE) return -1;
     return tasks[task_id].exit_code;
@@ -153,6 +167,7 @@ int task_destroy(uint32_t task_id) {
     tasks[task_id].address_space.user_table_physical = 0;
     tasks[task_id].kernel_stack_top = 0;
     tasks[task_id].exit_code = 0;
+    ipc_reset_task(task_id);
     __asm__ volatile ("" : : : "memory");
     tasks[task_id].state = TASK_UNUSED;
     return 0;
