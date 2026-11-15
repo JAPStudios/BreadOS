@@ -167,6 +167,7 @@ int task_destroy(uint32_t task_id) {
     tasks[task_id].address_space.user_table_physical = 0;
     tasks[task_id].kernel_stack_top = 0;
     tasks[task_id].exit_code = 0;
+    ipc_remove_sender(task_id);
     ipc_reset_task(task_id);
     __asm__ volatile ("" : : : "memory");
     tasks[task_id].state = TASK_UNUSED;
