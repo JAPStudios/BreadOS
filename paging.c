@@ -160,3 +160,24 @@ void paging_switch_kernel_address_space(void) {
     active_directory_physical = (uint32_t)(uintptr_t)page_directory;
     __asm__ volatile("mov %0, %%cr3" : : "r"(active_directory_physical) : "memory");
 }
+
+int paging_user_range_valid(const struct paging_address_space *space,
+                            uint32_t address,uint32_t length,int writable) {
+    if (!space || !space->user_table_physical || !length ||
+        (writable!=0 && writable!=1) ||
+        address<USER_REGION_START ||
+        (uint64_t)address+(uint64_t)length>USER_REGION_END)
+        return 0;
+    const uint32_t *table=(const uint32_t *)(uintptr_t)space->user_table_physical;
+    uint32_t first=address&~(PAGE_SIZE-1u);
+    uint32_t last=(address+length-1u)&~(PAGE_SIZE-1u);
+    for (uint32_t page=first;;page+=PAGE_SIZE) {
+        uint32_t entry=table[(page>>12)&0x3FFu];
+        if (!(entry&PAGE_PRESENT) || !(entry&PAGE_USER) ||
+            (writable && !(entry&PAGE_WRITABLE)))
+            return 0;
+        if (page==last) break;
+        if (page>0xFFFFFFFFu-PAGE_SIZE) return 0;
+    }
+    return 1;
+}

@@ -25,4 +25,8 @@ void paging_address_space_unmap_user_page(struct paging_address_space *space,
 int paging_switch_address_space(const struct paging_address_space *space);
 void paging_switch_kernel_address_space(void);
 
+/* Validate every page in a user range before the kernel copies through it. */
+int paging_user_range_valid(const struct paging_address_space *space,
+                            uint32_t address, uint32_t length, int writable);
+
 #endif
