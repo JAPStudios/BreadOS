@@ -1,4 +1,5 @@
 #include "process.h"
+#include "task.h"
 #include "memory.h"
 #include "paging.h"
 #include "syscall.h"
@@ -140,13 +141,19 @@ static int process_execute_elf_inner(const void *bytes,size_t size) {
     }
     (void)stack_frame;
 
+    if (task_set_address_space(&space)<0) {
+        process_release_pages(&space);
+        return -1;
+    }
     if (paging_switch_address_space(&space)<0) {
+        task_set_address_space(0);
         process_release_pages(&space);
         return -1;
     }
     syscall_begin_process();
     user_enter(image.entry,ELF32_USER_STACK_PAGE+PAGE_SIZE-16u);
     paging_switch_kernel_address_space();
+    task_set_address_space(0);
     int exit_code=syscall_last_exit_code();
     process_release_pages(&space);
     return exit_code;
