@@ -7,6 +7,9 @@
 /* Initialize the round-robin kernel-thread scheduler before enabling IRQs. */
 void tasking_init(void);
 
+/* Set the current task's ring-0 stack top for privilege transitions. */
+int task_set_kernel_stack(uint32_t stack_top);
+
 /* Associate the current kernel task with a private address space, or NULL for kernel-only. */
 int task_set_address_space(const struct paging_address_space *space);
 

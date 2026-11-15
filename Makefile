@@ -61,7 +61,7 @@ $(BUILD)/secure_memory.o: secure_memory.c secure_memory.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/desktop.o: desktop.c desktop.h video.h theme.h memory.h task.h kernel/keyboard.h kernel/mouse.h notification.h clipboard.h reminder.h idle.h launcher.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
-$(BUILD)/task.o: task.c task.h paging.h | $(BUILD)
+$(BUILD)/task.o: task.c task.h paging.h gdt.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/keyboard.o: kernel/keyboard.c kernel/keyboard.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
