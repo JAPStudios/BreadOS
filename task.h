@@ -25,6 +25,8 @@ int task_create_user(uint32_t *initial_frame,
 /* Mark the current user task for deferred cleanup after another address space is active. */
 int task_terminate_current(int exit_code);
 int task_is_zombie(uint32_t task_id);
+int task_is_runnable(uint32_t task_id);
+const struct paging_address_space *task_current_address_space(void);
 int task_exit_code(uint32_t task_id);
 int task_destroy(uint32_t task_id);
 uint32_t task_current_id(void);
