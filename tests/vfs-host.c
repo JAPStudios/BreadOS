@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "vfs.h"
+#include "fs.h"
 #include "pfs.h"
 #include "memory.h"
 #include "interrupts.h"
