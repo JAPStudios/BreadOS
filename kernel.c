@@ -9,6 +9,7 @@
 #include "paging.h"
 #include "video.h"
 #include "pfs.h"
+#include "vfs.h"
 #include "gdt.h"
 #include "task.h"
 #include "kernel/keyboard.h"
@@ -72,14 +73,26 @@ static int parse_u32(const char *text,uint32_t *out) {
 }
 static void hex32(uint32_t value){static const char d[]="0123456789ABCDEF";for(int s=28;s>=0;s-=4)put(d[(value>>s)&15u]);}
 static void prompt(void){puts("bread> ");}
-static size_t file_count(void){return pfs_ready()?pfs_count():fs_count();}
-static const char *file_name(size_t i){return pfs_ready()?pfs_name(i):fs_name(i);}
-static int file_read(const char *name,char *out,size_t capacity){return pfs_ready()?pfs_read(name,out,capacity):fs_read(name,out,capacity);}
-static int file_write(const char *name,const char *data){return pfs_ready()?pfs_write(name,data):fs_write(name,data);}
-static int file_remove(const char *name){return pfs_ready()?pfs_remove(name):fs_remove(name);}
-static int file_mkdir(const char *path){return pfs_ready()?pfs_mkdir(path):fs_mkdir(path);}
-static int file_rmdir(const char *path){return pfs_ready()?pfs_rmdir(path):fs_rmdir(path);}
-static int file_move(const char *source,const char *destination){return pfs_ready()?pfs_move(source,destination):fs_move(source,destination);}
+static size_t file_count(void){
+    size_t count=0;struct vfs_dirent entry;
+    while(vfs_readdir("/",count,&entry)==0)++count;
+    return count;
+}
+static const char *file_name(size_t index){
+    static char name[VFS_PATH_MAX+1u];struct vfs_dirent entry;
+    if(vfs_readdir("/",index,&entry)<0)return 0;
+    size_t i=0;while(entry.name[i] && i<sizeof(name)-1u){name[i]=entry.name[i];++i;}
+    name[i]=0;return name;
+}
+static int file_read(const char *name,char *out,size_t capacity){return vfs_read_all(name,out,capacity,0);}
+static int file_write(const char *name,const char *data){
+    size_t n=0;while(data[n])++n;
+    return vfs_write_all(name,data,n,0);
+}
+static int file_remove(const char *path){return vfs_unlink(path);}
+static int file_mkdir(const char *path){return vfs_mkdir(path);}
+static int file_rmdir(const char *path){return vfs_rmdir(path);}
+static int file_move(const char *source,const char *destination){return vfs_rename(source,destination);}
 size_t bread_file_count(void){return file_count();}
 const char *bread_file_name(size_t index){return file_name(index);}
 int bread_file_read(const char *name,char *out,size_t capacity){return file_read(name,out,capacity);}
@@ -247,6 +260,7 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     pci_init();puts("PCI configuration-space scan complete.\\n");
     if(video_init(mbi)==0){theme_apply(theme_current()->name);puts("GRUB RGB framebuffer mapped; native graphical text console initialized.\n");}else puts("No supported GRUB RGB framebuffer; VGA text fallback active.\n");
     int storage=pfs_init();if(storage==2)puts("Persistent BreadFS formatted and mounted.\n");else if(storage==1)puts("Persistent BreadFS mounted.\n");else{fs_init();if(storage==0)puts("RAM filesystem initialized (no usable ATA volume).\n");else puts("RAM filesystem initialized (ATA volume not recognized; disk left unchanged).\n");}
+    vfs_init();puts("Native VFS mounted at / with /dev and /proc.\\n");
     tasking_init();puts("Round-robin kernel scheduler initialized (3 kernel threads).\n");
     if(keyboard_init()==0)puts("PS/2 keyboard IRQ1 configured.\n");else puts("PS/2 keyboard IRQ1 unavailable; polling fallback enabled.\n");
     if(mouse_init(video_available()?video_width():640u,video_available()?video_height():480u)==0)puts("PS/2 mouse IRQ12 configured.\n");else puts("PS/2 mouse unavailable.\n");
