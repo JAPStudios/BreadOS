@@ -1,5 +1,6 @@
 #include "task.h"
 #include "paging.h"
+#include "gdt.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -17,6 +18,7 @@ struct task {
     uint32_t *saved_stack;
     uint8_t started;
     struct paging_address_space address_space;
+    uint32_t kernel_stack_top;
 };
 
 static struct task tasks[TASK_COUNT];
@@ -79,18 +81,28 @@ void tasking_init(void) {
         tasks[i].started = 0;
         tasks[i].address_space.directory_physical = 0;
         tasks[i].address_space.user_table_physical = 0;
+        tasks[i].kernel_stack_top = 0;
     }
 
     /* Task 0 is kernel_main/shell; its first frame is captured on IRQ0. */
     tasks[0].started = 1;
     tasks[1].saved_stack = make_initial_stack(task_stacks[0], worker_a);
     tasks[1].started = 1;
+    tasks[1].kernel_stack_top = (uint32_t)(uintptr_t)(task_stacks[0] + TASK_STACK_SIZE);
     tasks[2].saved_stack = make_initial_stack(task_stacks[1], worker_b);
     tasks[2].started = 1;
+    tasks[2].kernel_stack_top = (uint32_t)(uintptr_t)(task_stacks[1] + TASK_STACK_SIZE);
     current_task = 0;
     switches = 0;
     worker_a_ticks = 0;
     worker_b_ticks = 0;
+}
+
+int task_set_kernel_stack(uint32_t stack_top) {
+    if (!stack_top) return -1;
+    tasks[current_task].kernel_stack_top = stack_top;
+    gdt_set_kernel_stack(stack_top);
+    return 0;
 }
 
 int task_set_address_space(const struct paging_address_space *space) {
@@ -122,6 +134,9 @@ uint32_t *task_schedule(uint32_t *frame) {
         current_task = next;
         ++switches;
     }
+
+    if (tasks[current_task].kernel_stack_top)
+        gdt_set_kernel_stack(tasks[current_task].kernel_stack_top);
 
     /* Kernel workers never inherit a suspended user process's page table. */
     if (tasks[current_task].address_space.directory_physical) {
