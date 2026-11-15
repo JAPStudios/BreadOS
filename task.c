@@ -114,10 +114,12 @@ int task_create_user(uint32_t *initial_frame,
     for (uint32_t i = TASK_KERNEL_COUNT; i < TASK_MAX; ++i) {
         if (tasks[i].state != TASK_UNUSED) continue;
         tasks[i].saved_stack = initial_frame;
-        tasks[i].state = TASK_RUNNABLE;
         tasks[i].address_space = *space;
         tasks[i].kernel_stack_top = kernel_stack_top;
         tasks[i].exit_code = 0;
+        /* Publish the runnable state only after the complete context is ready. */
+        __asm__ volatile ("" : : : "memory");
+        tasks[i].state = TASK_RUNNABLE;
         return (int)i;
     }
     return -1;
