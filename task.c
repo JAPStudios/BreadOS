@@ -163,36 +163,38 @@ uint32_t *task_schedule(uint32_t *frame) {
     if (tasks[current_task].state == TASK_RUNNABLE)
         tasks[current_task].saved_stack = frame;
 
-    uint32_t next = current_task;
-    for (uint32_t attempt = 0; attempt < TASK_MAX; ++attempt) {
-        next = (next + 1u) % TASK_MAX;
-        if (tasks[next].state == TASK_RUNNABLE &&
-            tasks[next].saved_stack != 0)
-            break;
+    uint32_t next = TASK_MAX;
+    for (uint32_t attempt = 1; attempt <= TASK_MAX; ++attempt) {
+        uint32_t candidate = (current_task + attempt) % TASK_MAX;
+        if (tasks[candidate].state != TASK_RUNNABLE ||
+            !tasks[candidate].saved_stack)
+            continue;
+
+        if (tasks[candidate].address_space.directory_physical) {
+            if (paging_switch_address_space(&tasks[candidate].address_space) < 0) {
+                tasks[candidate].exit_code = -256;
+                tasks[candidate].state = TASK_ZOMBIE;
+                continue;
+            }
+        } else {
+            paging_switch_kernel_address_space();
+        }
+        next = candidate;
+        break;
     }
 
-    if (tasks[next].state != TASK_RUNNABLE || !tasks[next].saved_stack) {
-        /* Task zero is the permanent shell/reaper fallback. */
+    /* The shell task is permanently runnable and provides the idle fallback. */
+    if (next == TASK_MAX) {
         next = 0;
+        paging_switch_kernel_address_space();
     }
 
     if (next != current_task) {
         current_task = next;
         ++switches;
     }
-
     if (tasks[current_task].kernel_stack_top)
         gdt_set_kernel_stack(tasks[current_task].kernel_stack_top);
-
-    if (tasks[current_task].address_space.directory_physical) {
-        if (paging_switch_address_space(&tasks[current_task].address_space) < 0)
-            paging_switch_kernel_address_space();
-    } else {
-        paging_switch_kernel_address_space();
-    }
     return tasks[current_task].saved_stack;
 }
 
-uint32_t task_switch_count(void) {
-    return switches;
-}
