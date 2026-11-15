@@ -4,6 +4,8 @@
 
 static uint32_t active_directory;
 static uint32_t kernel_switches;
+static uint32_t active_kernel_stack;
+void gdt_set_kernel_stack(uint32_t stack_top) { active_kernel_stack = stack_top; }
 int paging_switch_address_space(const struct paging_address_space *space) {
     if (!space || !space->directory_physical || !space->user_table_physical) return -1;
     active_directory = space->directory_physical;
@@ -22,6 +24,8 @@ int main(void) {
     tasking_init();
     assert(task_switch_count() == 0);
     assert(active_directory == 0);
+    assert(task_set_kernel_stack(0x3000u) == 0);
+    assert(active_kernel_stack == 0x3000u);
     struct paging_address_space user_space = {0x1000u, 0x2000u};
     assert(task_set_address_space(&user_space) == 0);
 
@@ -30,6 +34,8 @@ int main(void) {
     assert(a != 0);
     assert(a != shell_frame);
     assert(task_switch_count() == 1);
+    uint32_t worker_a_stack = active_kernel_stack;
+    assert(worker_a_stack != 0 && worker_a_stack != 0x3000u);
 
     /* Next tick saves A and starts worker B on a distinct initial stack. */
     uint32_t *b = task_schedule(worker_a_frame);
@@ -37,18 +43,24 @@ int main(void) {
     assert(b != a);
     assert(b != worker_a_frame);
     assert(task_switch_count() == 2);
+    uint32_t worker_b_stack = active_kernel_stack;
+    assert(worker_b_stack != 0 && worker_b_stack != worker_a_stack);
 
     /* Next tick saves B and resumes the original shell interrupt frame. */
     uint32_t *shell = task_schedule(worker_b_frame);
     assert(shell == shell_frame);
     assert(task_switch_count() == 3);
+    assert(active_kernel_stack == 0x3000u);
     assert(active_directory == user_space.directory_physical);
 
     /* A later round resumes the exact saved worker frames. */
     assert(task_schedule(shell_frame) == worker_a_frame);
     assert(active_directory == 0); /* Worker A must not inherit user mappings. */
+    assert(active_kernel_stack == worker_a_stack);
     assert(task_schedule(worker_a_frame) == worker_b_frame);
+    assert(active_kernel_stack == worker_b_stack);
     assert(task_schedule(worker_b_frame) == shell_frame);
+    assert(active_kernel_stack == 0x3000u);
     assert(active_directory == user_space.directory_physical);
     assert(task_set_address_space(0) == 0);
     assert(task_switch_count() == 6);
