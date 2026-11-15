@@ -4,6 +4,7 @@
 #include "kernel/keyboard.h"
 #include "kernel/mouse.h"
 #include "syscall.h"
+#include "process.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -127,13 +128,13 @@ static void fatal_exception(uint32_t vector, uint32_t error_code) {
 }
 uint32_t *interrupt_handler(uint32_t vector, uint32_t error_code, uint32_t *frame) {
     if (vector < 32) {
-        if (syscall_abort_user_exception(frame, vector, error_code)) return frame;
+        if (syscall_abort_user_exception(frame, vector, error_code)) {\n            uint32_t *next = task_schedule(frame);\n            process_reap_zombies();\n            return next;\n        }
         fatal_exception(vector, error_code);
     }
     if (vector == 32) {
         ticks++;
         outb(PIC1_COMMAND, 0x20);
-        return task_schedule(frame);
+        uint32_t *next = task_schedule(frame);\n        process_reap_zombies();\n        return next;
     }
     if (vector == 33) {
         keyboard_irq_handler();
