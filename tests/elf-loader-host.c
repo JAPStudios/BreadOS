@@ -56,10 +56,14 @@ int main(void) {
     make_image();put32(76,7);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
     make_image();put32(76,13);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
     make_image();put32(76,1);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
-    /* A load segment cannot extend into the reserved user stack page. */
-    make_image();put32(24,ELF32_USER_START+0x3FE000);
-    put32(60,ELF32_USER_START+0x3FE000);put32(72,8192);
+    /* The page below the user stack is a guard and must remain unmapped. */
+    make_image();put32(24,ELF32_USER_STACK_GUARD_PAGE);
+    put32(60,ELF32_USER_STACK_GUARD_PAGE);
     assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    /* A segment may end exactly at the guard boundary without touching it. */
+    make_image();put32(24,ELF32_USER_STACK_GUARD_PAGE-4096u);
+    put32(60,ELF32_USER_STACK_GUARD_PAGE-4096u);
+    assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==0);
     puts("ELF loader validation tests passed");
     return 0;
 }
