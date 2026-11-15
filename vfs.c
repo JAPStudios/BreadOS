@@ -392,8 +392,11 @@ int vfs_write(int handle,const void *buffer,size_t count) {
 int vfs_seek(int handle,int32_t offset,int whence) {
     struct vfs_handle *h=handle_at(handle);
     if(!h || h->backend==VFS_BACKEND_DEV || h->backend==VFS_BACKEND_PROC) return -1;
-    int64_t base=whence==0?0:(whence==1?h->position:(whence==2?h->size:-1));
-    if(base<0) return -1;
+    int64_t base;
+    if(whence==0) base=0;
+    else if(whence==1) base=(int64_t)h->position;
+    else if(whence==2) base=(int64_t)h->size;
+    else return -1;
     int64_t next=base+offset;
     if(next<0 || next>VFS_FILE_MAX) return -1;
     h->position=(uint32_t)next;
