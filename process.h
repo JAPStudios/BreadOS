@@ -17,5 +17,6 @@ int process_file_read(int descriptor,void *buffer,uint32_t count);
 int process_file_write(int descriptor,const void *buffer,uint32_t count);
 int process_file_seek(int descriptor,int32_t offset,int whence);
 int process_file_close(int descriptor);
+void process_close_files_current(void);
 
 #endif
