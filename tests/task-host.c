@@ -61,8 +61,9 @@ int main(void) {
     assert(task_switch_count() == 6);
     assert(kernel_switches == 4);
 
-    int id = task_create_user(user_frame, &user_space, 0x5000u);
-    assert(id == 3);
+    uint32_t published_id=0xFFFFFFFFu;
+    int id = task_create_user_ex(user_frame, &user_space, 0x5000u, &published_id);
+    assert(id == 3 && published_id == 3u);
     assert(task_schedule(shell_frame) == worker_a_frame);
     assert(task_schedule(worker_a_frame) == worker_b_frame);
     assert(task_schedule(worker_b_frame) == user_frame);
