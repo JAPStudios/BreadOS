@@ -240,3 +240,16 @@ int process_run_user_demo(void) {
 
     return process_execute_elf(executable,sizeof(executable));
 }
+
+int process_task_at(uint32_t index,uint32_t *task_id,int *exiting) {
+    if (!task_id || !exiting) return -1;
+    for (uint32_t i=0;i<PROCESS_CAPACITY;i++) {
+        struct process_record *p=&processes[i];
+        if (!p->used) continue;
+        if (index) { --index; continue; }
+        *task_id=p->task_id;
+        *exiting=task_is_zombie(p->task_id);
+        return 0;
+    }
+    return -1;
+}
