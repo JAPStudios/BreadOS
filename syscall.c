@@ -60,8 +60,10 @@ int syscall_dispatch(uint32_t *saved_frame) {
         frame->eax=0;
         return 0;
     }
-    if (frame->eax==2u)
+    if (frame->eax==2u) {
+        process_close_files_current();
         return task_terminate_current((int)frame->ebx)==0;
+    }
 
     if (frame->eax==3u) {
         uint8_t message[IPC_MESSAGE_MAX];
@@ -168,5 +170,6 @@ int syscall_abort_user_exception(uint32_t *saved_frame, uint32_t vector,
         return 0;
     struct syscall_frame *frame=(struct syscall_frame *)(void *)saved_frame;
     if ((frame->cs & 3u) != 3u) return 0;
+    process_close_files_current();
     return task_terminate_current(-(int)(vector+1u))==0;
 }
