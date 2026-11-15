@@ -241,20 +241,18 @@ int process_run_user_demo(void) {
     return process_execute_elf(executable,sizeof(executable));
 }
 
-int process_task_at(uint32_t index,uint32_t *task_id,int *exiting) {
-    if (!task_id || !exiting) return -1;
+uint32_t process_snapshot(uint32_t *task_ids,uint8_t *exiting,uint32_t capacity) {
+    if (!task_ids || !exiting || !capacity) return 0;
     uint32_t flags;
     __asm__ volatile ("pushfl; popl %0; cli" : "=r"(flags) : : "memory");
-    int result=-1;
-    for (uint32_t i=0;i<PROCESS_CAPACITY;i++) {
+    uint32_t count=0;
+    for (uint32_t i=0;i<PROCESS_CAPACITY && count<capacity;i++) {
         struct process_record *p=&processes[i];
         if (!p->used || p->task_id<TASK_KERNEL_COUNT) continue;
-        if (index) { --index; continue; }
-        *task_id=p->task_id;
-        *exiting=task_is_zombie(p->task_id);
-        result=0;
-        break;
+        task_ids[count]=p->task_id;
+        exiting[count]=(uint8_t)task_is_zombie(p->task_id);
+        ++count;
     }
     __asm__ volatile ("pushl %0; popfl" : : "r"(flags) : "memory","cc");
-    return result;
+    return count;
 }
