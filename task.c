@@ -1,4 +1,5 @@
 #include "task.h"
+#include "paging.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -15,6 +16,7 @@
 struct task {
     uint32_t *saved_stack;
     uint8_t started;
+    struct paging_address_space address_space;
 };
 
 static struct task tasks[TASK_COUNT];
@@ -75,6 +77,8 @@ void tasking_init(void) {
     for (size_t i = 0; i < TASK_COUNT; ++i) {
         tasks[i].saved_stack = 0;
         tasks[i].started = 0;
+        tasks[i].address_space.directory_physical = 0;
+        tasks[i].address_space.user_table_physical = 0;
     }
 
     /* Task 0 is kernel_main/shell; its first frame is captured on IRQ0. */
@@ -87,6 +91,18 @@ void tasking_init(void) {
     switches = 0;
     worker_a_ticks = 0;
     worker_b_ticks = 0;
+}
+
+int task_set_address_space(const struct paging_address_space *space) {
+    if (space && (!space->directory_physical || !space->user_table_physical))
+        return -1;
+    if (space) {
+        tasks[current_task].address_space = *space;
+    } else {
+        tasks[current_task].address_space.directory_physical = 0;
+        tasks[current_task].address_space.user_table_physical = 0;
+    }
+    return 0;
 }
 
 uint32_t *task_schedule(uint32_t *frame) {
@@ -105,6 +121,14 @@ uint32_t *task_schedule(uint32_t *frame) {
     if (next != current_task) {
         current_task = next;
         ++switches;
+    }
+
+    /* Kernel workers never inherit a suspended user process's page table. */
+    if (tasks[current_task].address_space.directory_physical) {
+        if (paging_switch_address_space(&tasks[current_task].address_space) < 0)
+            paging_switch_kernel_address_space();
+    } else {
+        paging_switch_kernel_address_space();
     }
     return tasks[current_task].saved_stack;
 }
