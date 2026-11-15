@@ -4,19 +4,31 @@
 #include <stdint.h>
 #include "paging.h"
 
-/* Initialize the round-robin kernel-thread scheduler before enabling IRQs. */
+#define TASK_MAX 8u
+#define TASK_KERNEL_COUNT 3u
+
+enum task_state {
+    TASK_UNUSED = 0,
+    TASK_RUNNABLE = 1,
+    TASK_ZOMBIE = 2
+};
+
 void tasking_init(void);
-
-/* Set the current task's ring-0 stack top for privilege transitions. */
 int task_set_kernel_stack(uint32_t stack_top);
-
-/* Associate the current kernel task with a private address space, or NULL for kernel-only. */
 int task_set_address_space(const struct paging_address_space *space);
 
-/* Called by the timer interrupt with its saved register frame. */
-uint32_t *task_schedule(uint32_t *frame);
+/* Register a ring-3 task with its initial interrupt frame and private resources. */
+int task_create_user(uint32_t *initial_frame,
+                     const struct paging_address_space *space,
+                     uint32_t kernel_stack_top);
 
-/* Number of task switches since initialization. */
+/* Mark the current user task for deferred cleanup after another address space is active. */
+int task_terminate_current(int exit_code);
+int task_is_zombie(uint32_t task_id);
+int task_exit_code(uint32_t task_id);
+int task_destroy(uint32_t task_id);
+uint32_t task_current_id(void);
+uint32_t *task_schedule(uint32_t *frame);
 uint32_t task_switch_count(void);
 
 #endif
