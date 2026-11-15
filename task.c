@@ -106,9 +106,9 @@ int task_set_address_space(const struct paging_address_space *space) {
     return 0;
 }
 
-int task_create_user(uint32_t *initial_frame,
-                     const struct paging_address_space *space,
-                     uint32_t kernel_stack_top) {
+int task_create_user_ex(uint32_t *initial_frame,
+                        const struct paging_address_space *space,
+                        uint32_t kernel_stack_top,uint32_t *task_id_out) {
     if (!initial_frame || !space || !space->directory_physical ||
         !space->user_table_physical || !kernel_stack_top)
         return -1;
@@ -119,12 +119,19 @@ int task_create_user(uint32_t *initial_frame,
         tasks[i].kernel_stack_top = kernel_stack_top;
         tasks[i].exit_code = 0;
         ipc_reset_task(i);
+        if (task_id_out) *task_id_out=i;
         /* Publish the runnable state only after the complete context is ready. */
         __asm__ volatile ("" : : : "memory");
         tasks[i].state = TASK_RUNNABLE;
         return (int)i;
     }
     return -1;
+}
+
+int task_create_user(uint32_t *initial_frame,
+                     const struct paging_address_space *space,
+                     uint32_t kernel_stack_top) {
+    return task_create_user_ex(initial_frame,space,kernel_stack_top,0);
 }
 
 int task_terminate_current(int exit_code) {
