@@ -47,12 +47,13 @@ static struct process_record *process_reserve(void) {
     for (uint32_t i=0;i<PROCESS_CAPACITY;i++) {
         if (!processes[i].used) {
             struct process_record *p=&processes[i];
-            p->used=1;
             p->task_id=0;
             p->kernel_stack_frame=0;
             p->address_space.directory_physical=0;
             p->address_space.user_table_physical=0;
             p->page_count=0;
+            __asm__ volatile ("" : : : "memory");
+            p->used=1;
             return p;
         }
     }
@@ -67,10 +68,11 @@ static void process_release_resources(struct process_record *p) {
         memory_free_frame(p->pages[i].physical_address);
     if (p->kernel_stack_frame)
         memory_free_frame(p->kernel_stack_frame);
-    p->used=0;
     p->task_id=0;
     p->kernel_stack_frame=0;
     p->page_count=0;
+    __asm__ volatile ("" : : : "memory");
+    p->used=0;
 }
 
 static int process_add_page(struct process_record *p,uint32_t virtual_address,
