@@ -267,7 +267,18 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     while(task_switch_count()<6u){__asm__ volatile("hlt");}
     puts("Scheduler smoke test passed: round-robin task switching verified.\n");
     int user_result=process_run_user_demo();
-    if(user_result>=0){puts("Ring-3 process scheduling smoke test started (task ");hex32((uint32_t)user_result);puts(").\n");}else puts("Ring-3 process scheduling smoke test failed to start.\n");
+    if(user_result>=0) {
+        uint32_t process_start_tick=timer_ticks();
+        while(process_active_count() &&
+              (uint32_t)(timer_ticks()-process_start_tick)<500u)
+            __asm__ volatile("hlt");
+        if(!process_active_count())
+            puts("Ring-3 process and syscall smoke test passed.\n");
+        else
+            puts("Ring-3 process and syscall smoke test timed out.\n");
+    } else {
+        puts("Ring-3 process scheduling smoke test failed to start.\n");
+    }
     prompt();
     for(;;){reminder_poll(timer_ticks());char c;if(!keyboard_read_char(&c)){__asm__ volatile("hlt");continue;}if(c=='\n'){command();continue;}if(c=='\b'){if(n){n--;put('\b');put(' ');put('\b');}continue;}if(n<sizeof(line)-1){line[n++]=c;put(c);}}
 }
