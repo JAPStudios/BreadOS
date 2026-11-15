@@ -2,7 +2,7 @@
 .section .text
 .global user_enter
 .type user_enter, @function
-.extern gdt_set_kernel_stack
+.extern task_set_kernel_stack
 user_enter:
     pushl %ebp
     movl %esp, %ebp
@@ -11,7 +11,7 @@ user_enter:
     pushl %edi
     movl %esp, %eax
     pushl %eax
-    call gdt_set_kernel_stack
+    call task_set_kernel_stack
     addl $4, %esp
 
     movl 8(%ebp), %eax
