@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include "task.h"
 void ipc_reset_task(uint32_t task_id) { (void)task_id; }
+void ipc_remove_sender(uint32_t task_id) { (void)task_id; }
 
 static uint32_t active_directory;
 static uint32_t kernel_switches;
