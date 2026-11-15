@@ -4,7 +4,7 @@
 #include <stdint.h>
 #define VFS_PATH_MAX 63u
 #define VFS_FILE_MAX 65535u
-#define VFS_OPEN_MAX 4u
+#define VFS_OPEN_MAX 24u
 #define VFS_O_READ 0x01u
 #define VFS_O_WRITE 0x02u
 #define VFS_O_CREATE 0x04u
