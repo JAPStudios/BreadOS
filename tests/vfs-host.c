@@ -44,12 +44,14 @@ int main(void) {
     assert(vfs_stat_path("/proc/tasks", &status)==0 && status.type==VFS_NODE_FILE);
     assert(vfs_open("/../escape",VFS_O_READ)<0);
     assert(vfs_open("/dev",VFS_O_READ)<0);
+    assert(vfs_mount("/dev",VFS_BACKEND_DEV)<0);
+    assert(vfs_open("/missing/a.txt",VFS_O_WRITE|VFS_O_CREATE)<0);
 
     assert(vfs_mkdir("/docs")==0);
     assert(vfs_write_all("/docs/a.txt","alpha",5,0)==5);
     assert(vfs_read_all("/docs/a.txt",buffer,sizeof(buffer),0)==5);
     assert(strcmp(buffer,"alpha")==0);
-    assert(vfs_readdir("/docs",0,&entry)==0);
+    assert(vfs_readdir("/docs/",0,&entry)==0);
     assert(strcmp(entry.name,"a.txt")==0 && entry.type==VFS_NODE_FILE);
     assert(vfs_rename("/docs/a.txt","/docs/b.txt")==0);
     assert(vfs_read_all("/docs/b.txt",buffer,sizeof(buffer),0)==5);
@@ -67,6 +69,8 @@ int main(void) {
     assert(vfs_seek(fd,0,0)==0);
     assert(vfs_read(fd,buffer,3)==3);
     assert(memcmp(buffer,"xyz",3)==0);
+    assert(vfs_seek(fd,100,0)==0);
+    assert(vfs_read(fd,buffer,1)==0);
     assert(vfs_close(fd)==0);
 
     fd=vfs_open("/dev/null",VFS_O_WRITE);
