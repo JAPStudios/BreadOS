@@ -130,6 +130,7 @@ int task_terminate_current(int exit_code) {
         tasks[current_task].state != TASK_RUNNABLE)
         return -1;
     tasks[current_task].exit_code = exit_code;
+    __asm__ volatile ("" : : : "memory");
     tasks[current_task].state = TASK_ZOMBIE;
     return 0;
 }
@@ -148,11 +149,12 @@ int task_destroy(uint32_t task_id) {
         tasks[task_id].state != TASK_ZOMBIE || task_id == current_task)
         return -1;
     tasks[task_id].saved_stack = 0;
-    tasks[task_id].state = TASK_UNUSED;
     tasks[task_id].address_space.directory_physical = 0;
     tasks[task_id].address_space.user_table_physical = 0;
     tasks[task_id].kernel_stack_top = 0;
     tasks[task_id].exit_code = 0;
+    __asm__ volatile ("" : : : "memory");
+    tasks[task_id].state = TASK_UNUSED;
     return 0;
 }
 
