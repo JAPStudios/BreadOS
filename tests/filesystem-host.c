@@ -106,6 +106,25 @@ static void test_persistent_directories_and_moves(void) {
     assert(strcmp(output, "inside") == 0);
 }
 
+static void test_legacy_dot_segment_entries_remain_mountable(void) {
+    char output[16];
+    make_valid_volume();
+    memset(disk[1], 0, SECTOR_SIZE);
+    /* Simulate metadata written by a pre-hardening BreadFS v1 release. */
+    memcpy(disk[1], "../legacy", sizeof("../legacy"));
+    disk[1][FS_NAME_MAX + 1u] = 4u;
+    disk[1][FS_NAME_MAX + 3u] = 1u;
+    assert(pfs_init() == 1);
+    assert(pfs_ready() == 1);
+    /* The legacy record is preserved but cannot be addressed through APIs. */
+    assert(pfs_read("../legacy", output, sizeof(output)) == -1);
+    assert(pfs_write("../new-file", "blocked") == -1);
+    assert(pfs_write("normal.txt", "safe") == 4);
+    memset(output, 0, sizeof(output));
+    assert(pfs_read("normal.txt", output, sizeof(output)) == 4);
+    assert(strcmp(output, "safe") == 0);
+}
+
 static void test_malformed_disk_name_is_rejected(void) {
     make_valid_volume();
     /* First entry has no NUL inside its fixed-width on-disk name field. */
@@ -212,6 +231,7 @@ int main(void) {
     test_ram_directories_and_moves();
     test_persistent_directories_and_moves();
     test_malformed_disk_name_is_rejected();
+    test_legacy_dot_segment_entries_remain_mountable();
     test_persistent_binary_files();
     test_duplicate_persistent_entries_are_rejected();
     test_invalid_persistent_metadata_is_rejected();
