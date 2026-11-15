@@ -215,12 +215,12 @@ static void command(void){
     else if(eq(arg,"pci")){size_t count=pci_device_count();puts("PCI devices: ");hex32((uint32_t)count);puts("\n");for(size_t i=0;i<count;i++){const struct pci_device *d=pci_device_at(i);if(d){puts("bus ");hex32(d->bus);puts(" dev ");hex32(d->device);puts(" fn ");hex32(d->function);puts(" vendor ");hex32(d->vendor_id);puts(" device ");hex32(d->device_id);puts(" class ");hex32(d->class_code);puts(":");hex32(d->subclass);puts("\n");}}}
     else if(eq(arg,"about"))puts("BreadOS: freestanding 32-bit x86 kernel; Multiboot v1 boot.\n");
     else if(eq(arg,"video")){if(video_available()){puts("Framebuffer: ");hex32(video_width());puts(" x ");hex32(video_height());puts(" RGB\n");}else puts("No supported RGB framebuffer; VGA text console remains active.\n");}
-    else if(eq(arg,"userdemo")){int result=process_run_user_demo();if(result==0)puts("Ring-3 process exited successfully.\n");else puts("Ring-3 process failed.\n");}
-    else if(eq(arg,"exec")){if(!*rest)puts("Usage: exec PATH (persistent ELF32/i386 executable).\n");else {int result=process_execute_file(rest);if(result>=0){puts("Process exited with status ");hex32((uint32_t)result);puts("\n");}else puts("Executable could not be loaded or process failed.\n");}}
+    else if(eq(arg,"userdemo")){int result=process_run_user_demo();if(result>=0){puts("Ring-3 process started as task ");hex32((uint32_t)result);puts(".\n");}else puts("Ring-3 process could not be started.\n");}
+    else if(eq(arg,"exec")){if(!*rest)puts("Usage: exec PATH (persistent ELF32/i386 executable).\n");else {int result=process_execute_file(rest);if(result>=0){puts("Process started as task ");hex32((uint32_t)result);puts(".\n");}else puts("Executable could not be loaded or started.\n");}}
     else if(eq(arg,"memory")){puts("Free 4 KiB frames: 0x");hex32(memory_free_frames());puts("\n");}
     else if(eq(arg,"storage")){if(pfs_ready())puts("Persistent BreadFS on ATA primary-master disk.\n");else puts("Volatile RAM filesystem; no usable BreadFS volume.\n");}
     else if(eq(arg,"uptime")){puts("PIT ticks at 100 Hz: ");hex32(timer_ticks());puts("\n");}
-    else if(eq(arg,"tasks")){puts("Timer-driven kernel task switches: ");hex32(task_switch_count());puts("\n");}
+    else if(eq(arg,"tasks")){puts("Timer-driven task switches: ");hex32(task_switch_count());puts("\nActive user processes: ");hex32(process_active_count());puts("\n");}
     else if(eq(arg,"ls")){for(size_t i=0;i<file_count();++i){const char *name=file_name(i);if(name){puts(name);puts("\n");}}}
     else if(eq(arg,"cat")){char content[FS_DATA_MAX+1u];if(!*rest)puts("Usage: cat NAME\n");else if(file_read(rest,content,sizeof(content))<0)puts("File not found.\n");else {puts(content);if(content[0]){size_t k=0;while(content[k])++k;if(content[k-1]!='\n')puts("\n");}}}
     else if(eq(arg,"write")){char *name=rest;while(*rest && *rest!=' ')++rest;if(*rest){*rest++=0;while(*rest==' ')++rest;if(!*rest)puts("Usage: write NAME TEXT\n");else {int result=file_write(name,rest);if(result>=0){if(pfs_ready())puts("File written to disk.\n");else puts("File written to RAM.\n");}else if(result==-2)puts("Error: file content limit is 255 bytes.\n");else if(result==-3)puts("Error: RAM filesystem is full.\n");else puts("Invalid filename. Use letters, numbers, dot, dash, underscore.\n");}}else puts("Usage: write NAME TEXT\n");}
@@ -267,7 +267,7 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     while(task_switch_count()<6u){__asm__ volatile("hlt");}
     puts("Scheduler smoke test passed: round-robin task switching verified.\n");
     int user_result=process_run_user_demo();
-    if(user_result>=0){puts("Ring-3 process scheduling smoke test started (task ");hex32((uint32_t)user_result);puts(").\\n");}else puts("Ring-3 process scheduling smoke test failed to start.\\n");
+    if(user_result>=0){puts("Ring-3 process scheduling smoke test started (task ");hex32((uint32_t)user_result);puts(").\n");}else puts("Ring-3 process scheduling smoke test failed to start.\n");
     prompt();
     for(;;){reminder_poll(timer_ticks());char c;if(!keyboard_read_char(&c)){__asm__ volatile("hlt");continue;}if(c=='\n'){command();continue;}if(c=='\b'){if(n){n--;put('\b');put(' ');put('\b');}continue;}if(n<sizeof(line)-1){line[n++]=c;put(c);}}
 }
