@@ -45,6 +45,14 @@ static void elf_put32(uint8_t *image,uint32_t offset,uint32_t value) {
     for (uint32_t i=0;i<4;i++) image[offset+i]=(uint8_t)(value>>(i*8u));
 }
 
+static void emit_byte(uint8_t *code,uint32_t *length,uint8_t value) {
+    code[(*length)++]=value;
+}
+static void emit_word(uint8_t *code,uint32_t *length,uint32_t value) {
+    elf_put32(code,*length,value);
+    *length+=4u;
+}
+
 static struct process_record *process_reserve(void) {
     for (uint32_t i=0;i<PROCESS_CAPACITY;i++) {
         if (!processes[i].used) {
@@ -213,19 +221,46 @@ uint32_t process_active_count(void) {
 }
 
 int process_run_user_demo(void) {
-    static const uint8_t program[] = {
-        0xB9,0x00,0x2D,0x31,0x01,
-        0x49,0x75,0xFD,
-        0xB8,0x01,0x00,0x00,0x00,
-        0xBB,'U',0x00,0x00,0x00,
-        0xCD,0x80,
-        0xB8,0x02,0x00,0x00,0x00,
-        0xBB,0x00,0x00,0x00,0x00,
-        0xCD,0x80,
-        0xEB,0xFE
-    };
+    static uint8_t program[128];
     static uint8_t executable[8192];
-    for (uint32_t i=0;i<sizeof(executable);i++) executable[i]=0;
+    uint32_t length=0;
+    uint32_t buffer_address=ELF32_USER_STACK_PAGE+0x100u;
+    uint32_t path_immediate;
+
+    /* Store the byte to write through the user stack mapping. */
+    emit_byte(program,&length,0xC7);emit_byte(program,&length,0x05);
+    emit_word(program,&length,buffer_address);emit_word(program,&length,'U');
+
+    /* open("/dev/console", WRITE) */
+    emit_byte(program,&length,0xB8);emit_word(program,&length,6u);
+    emit_byte(program,&length,0xBB);path_immediate=length;emit_word(program,&length,0);
+    emit_byte(program,&length,0xB9);emit_word(program,&length,VFS_O_WRITE);
+    emit_byte(program,&length,0xCD);emit_byte(program,&length,0x80);
+
+    /* write(fd, stack_buffer, 1) */
+    emit_byte(program,&length,0x89);emit_byte(program,&length,0xC6);
+    emit_byte(program,&length,0xB8);emit_word(program,&length,8u);
+    emit_byte(program,&length,0x89);emit_byte(program,&length,0xF3);
+    emit_byte(program,&length,0xB9);emit_word(program,&length,buffer_address);
+    emit_byte(program,&length,0xBA);emit_word(program,&length,1u);
+    emit_byte(program,&length,0xCD);emit_byte(program,&length,0x80);
+
+    /* close(fd), then exit(0) */
+    emit_byte(program,&length,0xB8);emit_word(program,&length,9u);
+    emit_byte(program,&length,0x89);emit_byte(program,&length,0xF3);
+    emit_byte(program,&length,0xCD);emit_byte(program,&length,0x80);
+    emit_byte(program,&length,0xB8);emit_word(program,&length,2u);
+    emit_byte(program,&length,0xBB);emit_word(program,&length,0u);
+    emit_byte(program,&length,0xCD);emit_byte(program,&length,0x80);
+    emit_byte(program,&length,0xEB);emit_byte(program,&length,0xFE);
+
+    static const char path[]="/dev/console";
+    elf_put32(program,path_immediate,ELF32_USER_START+length);
+    uint32_t file_size=length+(uint32_t)sizeof(path);
+    for(uint32_t i=0;i<sizeof(executable);i++)executable[i]=0;
+    for(uint32_t i=0;i<length;i++)executable[4096u+i]=program[i];
+    for(uint32_t i=0;i<sizeof(path);i++)
+        executable[4096u+length+i]=(uint8_t)path[i];
 
     executable[0]=0x7F;executable[1]='E';executable[2]='L';executable[3]='F';
     executable[4]=1;executable[5]=1;executable[6]=1;
@@ -240,12 +275,10 @@ int process_run_user_demo(void) {
     elf_put32(executable,52,1);
     elf_put32(executable,56,4096);
     elf_put32(executable,60,ELF32_USER_START);
-    elf_put32(executable,68,(uint32_t)sizeof(program));
+    elf_put32(executable,68,file_size);
     elf_put32(executable,72,PAGE_SIZE);
     elf_put32(executable,76,5);
     elf_put32(executable,80,PAGE_SIZE);
-    for (uint32_t i=0;i<sizeof(program);i++) executable[4096u+i]=program[i];
-
     return process_execute_elf(executable,sizeof(executable));
 }
 
