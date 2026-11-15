@@ -81,6 +81,42 @@ static int valid_path(const char *path) {
          path[component_start + 1u] == '.')) return 0;
     return 1;
 }
+
+/* BreadFS v1 volumes may contain dot-segment names accepted by older builds.
+   Keep those records mountable for compatibility, but never accept them in
+   public path operations (which continue to use valid_path). */
+static int valid_stored_path(const char *path) {
+    if (!path) return 0;
+    size_t n = string_length(path);
+    if (!n || n > FS_NAME_MAX || path[0] == '/' || path[n - 1u] == '/') return 0;
+    size_t component = 0;
+    for (size_t i = 0; i < n; ++i) {
+        char c = path[i];
+        if (c == '/') {
+            if (!component) return 0;
+            component = 0;
+        } else {
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                  (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.'))
+                return 0;
+            ++component;
+        }
+    }
+    return component != 0;
+}
+
+static int has_dot_component(const char *path) {
+    size_t n = string_length(path), start = 0;
+    for (size_t i = 0; i <= n; ++i) {
+        if (i == n || path[i] == '/') {
+            size_t length = i - start;
+            if (length == 1u && path[start] == '.') return 1;
+            if (length == 2u && path[start] == '.' && path[start + 1u] == '.') return 1;
+            start = i + 1u;
+        }
+    }
+    return 0;
+}
 static int find(const char *name) {
     if (!name) return -1;
     for (size_t i = 0; i < FS_MAX_FILES; ++i)
@@ -143,9 +179,9 @@ static int valid_entry(const struct pfs_entry *entry) {
         char path[FS_NAME_MAX + 1u];
         for (size_t i = 0; i < n - 1u; ++i) path[i] = entry->name[i];
         path[n - 1u] = 0;
-        return valid_path(path);
+        return valid_stored_path(path);
     }
-    return valid_path(entry->name);
+    return valid_stored_path(entry->name);
 }
 static int same_entry_path(const struct pfs_entry *a,const struct pfs_entry *b) {
     size_t an=string_length(a->name),bn=string_length(b->name);
@@ -166,7 +202,8 @@ static int valid_directory_tree(void) {
         if (directory[i].reserved==1u) --n;
         copy_bytes(path,directory[i].name,n);
         path[n]=0;
-        if (!parent_exists(path)) return 0;
+        /* Unsafe legacy names remain quarantined: public APIs reject them. */
+        if (!has_dot_component(path) && !parent_exists(path)) return 0;
     }
     return 1;
 }
