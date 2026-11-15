@@ -91,6 +91,14 @@ int main(void) {
     assert(fd>=0 && vfs_write(fd,"OK",2)==2 && vfs_close(fd)==0);
     assert(console_length==2 && console_output[0]=='O' && console_output[1]=='K');
 
+    int descriptors[VFS_OPEN_MAX];
+    for(unsigned i=0;i<VFS_OPEN_MAX;i++) {
+        descriptors[i]=vfs_open("/welcome.txt",VFS_O_READ);
+        assert(descriptors[i]>=0);
+    }
+    assert(vfs_open("/welcome.txt",VFS_O_READ)<0);
+    for(unsigned i=0;i<VFS_OPEN_MAX;i++)assert(vfs_close(descriptors[i])==0);
+
     assert(vfs_readdir("/",0,&entry)==0);
     assert(strcmp(entry.name,"dev")==0 && entry.type==VFS_NODE_DIRECTORY);
     return 0;
