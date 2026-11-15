@@ -314,209 +314,28 @@ int vfs_open(const char *path,uint32_t flags) {
     return slot;
 }
 
+static void discard_handle(struct vfs_handle *h) {
+    if(!h)return;
+    h->used=0;
+    h->dirty=0;
+    bytes_zero(h->data,sizeof(h->data));
+}
 int vfs_close(int handle) {
     struct vfs_handle *h=handle_at(handle);
-    if(!h) return -1;
+    if(!h)return -1;
+    int result=0;
     if(h->dirty) {
-        int result;
         if(h->flags&VFS_O_BINARY)
             result=backend_write_binary(h->backend,h->path,h->data,h->size);
         else {
-            if(h->size>FS_DATA_MAX) return -1;
-            h->data[h->size]=0;
-            result=backend_write_text(h->backend,h->path,(const char *)h->data);
-        }
-        if(result<0) return -1;
-    }
-    h->used=0;
-    bytes_zero(h->data,sizeof(h->data));
-    return 0;
-}
-
-int vfs_read(int handle,void *buffer,size_t count) {
-    struct vfs_handle *h=handle_at(handle);
-    if(!h || !(h->flags&VFS_O_READ) || (!buffer&&count)) return -1;
-    if(!count) return 0;
-    if(h->backend==VFS_BACKEND_DEV) {
-        uint8_t *out=(uint8_t *)buffer;
-        if(h->device==1u) return 0;
-        if(h->device==2u) { for(size_t i=0;i<count;i++)out[i]=0;return (int)count; }
-        if(h->device==3u) {
-            size_t n=0;char c;
-            while(n<count && keyboard_read_char(&c)){out[n++]=(uint8_t)c;}
-            return n?(int)n:-1;
-        }
-        if(h->device==4u) return -1;
-    }
-    size_t remaining=h->size-h->position;
-    if(count>remaining) count=remaining;
-    bytes_copy(buffer,h->data+h->position,count);
-    h->position+=(uint32_t)count;
-    return (int)count;
-}
-
-int vfs_write(int handle,const void *buffer,size_t count) {
-    struct vfs_handle *h=handle_at(handle);
-    if(!h || !(h->flags&VFS_O_WRITE) || (!buffer&&count)) return -1;
-    if(!count) return 0;
-    if(h->backend==VFS_BACKEND_DEV) {
-        if(h->device==1u || h->device==2u) return (int)count;
-        if(h->device==3u || h->device==4u) {
-            const char *s=(const char *)buffer;
-            for(size_t i=0;i<count;i++) console_put_char(s[i]);
-            return (int)count;
-        }
-        return -1;
-    }
-    uint32_t limit=(h->flags&VFS_O_BINARY)?VFS_FILE_MAX:FS_DATA_MAX;
-    if(h->position>limit || count>limit-h->position) return -1;
-    const uint8_t *source=(const uint8_t *)buffer;
-    if(!(h->flags&VFS_O_BINARY)) {
-        for(size_t i=0;i<count;i++) if(source[i]==0) return -1;
-    }
-    if(h->position>h->size)
-        bytes_zero(h->data+h->size,h->position-h->size);
-    bytes_copy(h->data+h->position,buffer,count);
-    h->position+=(uint32_t)count;
-    if(h->position>h->size) h->size=h->position;
-    h->dirty=1;
-    return (int)count;
-}
-
-int vfs_seek(int handle,int32_t offset,int whence) {
-    struct vfs_handle *h=handle_at(handle);
-    if(!h || h->backend==VFS_BACKEND_DEV || h->backend==VFS_BACKEND_PROC) return -1;
-    int64_t base=whence==0?0:(whence==1?h->position:(whence==2?h->size:-1));
-    if(base<0) return -1;
-    int64_t next=base+offset;
-    if(next<0 || next>VFS_FILE_MAX) return -1;
-    h->position=(uint32_t)next;
-    return 0;
-}
-
-int vfs_stat_path(const char *path,struct vfs_stat *status) {
-    if(!status) return -1;
-    enum vfs_backend backend;const char *relative;char normalized[VFS_PATH_MAX+1u];
-    if(resolve_path(path,&backend,&relative,normalized)<0) return -1;
-    if(!*relative) { status->type=VFS_NODE_DIRECTORY;status->size=0;return 0; }
-    if(backend==VFS_BACKEND_DEV) {
-        int id=device_id(relative);if(!id)return -1;
-        status->type=VFS_NODE_DEVICE;status->size=0;return 0;
-    }
-    if(backend==VFS_BACKEND_PROC) {
-        if(!proc_name(relative))return -1;
-        status->type=VFS_NODE_FILE;status->size=0;return 0;
-    }
-    int is_directory=0;
-    if(!backend_exists(backend,relative,&is_directory))return -1;
-    status->type=is_directory?VFS_NODE_DIRECTORY:VFS_NODE_FILE;
-    status->size=0;
-    return 0;
-}
-
-static int add_dirent(struct vfs_dirent *entries,size_t *count,
-                      const char *name,enum vfs_node_type type) {
-    size_t n=str_len(name);
-    if(!n || n>15u) return 0;
-    for(size_t i=0;i<*count;i++) if(str_eq(entries[i].name,name)) return 0;
-    struct vfs_dirent *e=&entries[(*count)++];
-    bytes_copy(e->name,name,n);e->name[n]=0;e->type=type;e->size=0;
-    return 1;
-}
-int vfs_readdir(const char *path,size_t index,struct vfs_dirent *entry) {
-    if(!entry)return -1;
-    struct vfs_stat directory_status;
-    if(vfs_stat_path(path,&directory_status)<0 || directory_status.type!=VFS_NODE_DIRECTORY) return -1;
-    enum vfs_backend backend;const char *relative;char normalized[VFS_PATH_MAX+1u];
-    if(resolve_path(path,&backend,&relative,normalized)<0)return -1;
-    struct vfs_dirent entries[FS_MAX_FILES+2u];size_t count=0;
-    if(backend==VFS_BACKEND_DEV) {
-        static const char *names[]={"null","zero","console","serial","uptime","meminfo"};
-        for(size_t i=0;i<sizeof(names)/sizeof(names[0]);i++)
-            add_dirent(entries,&count,names[i],VFS_NODE_DEVICE);
-    } else if(backend==VFS_BACKEND_PROC) {
-        static const char *names[]={"version","uptime","meminfo","tasks"};
-        for(size_t i=0;i<sizeof(names)/sizeof(names[0]);i++)
-            add_dirent(entries,&count,names[i],VFS_NODE_FILE);
-    } else {
-        if(!*relative) { add_dirent(entries,&count,"dev",VFS_NODE_DIRECTORY);add_dirent(entries,&count,"proc",VFS_NODE_DIRECTORY); }
-        size_t prefix_length=str_len(relative);
-        char prefix[VFS_PATH_MAX+1u];
-        if(prefix_length){bytes_copy(prefix,relative,prefix_length);prefix[prefix_length++]='/';}
-        prefix[prefix_length]=0;
-        for(size_t i=0;i<backend_count(backend);i++) {
-            const char *stored=backend_name(backend,i);
-            if(!stored || !str_starts(stored,prefix))continue;
-            const char *rest=stored+prefix_length;
-            if(!*rest)continue;
-            size_t child_length=0;
-            while(rest[child_length] && rest[child_length]!='/')++child_length;
-            if(!child_length)continue;
-            char child[16];
-            if(child_length>15u)continue;
-            bytes_copy(child,rest,child_length);child[child_length]=0;
-            enum vfs_node_type type=rest[child_length]=='/'?VFS_NODE_DIRECTORY:VFS_NODE_FILE;
-            add_dirent(entries,&count,child,type);
+            if(h->size>FS_DATA_MAX) result=-1;
+            else {
+                h->data[h->size]=0;
+                result=backend_write_text(h->backend,h->path,(const char *)h->data);
+            }
         }
     }
-    if(index>=count)return -1;
-    *entry=entries[index];
-    return 0;
+    discard_handle(h);
+    return result<0?-1:0;
 }
 
-static int resolve_backend_mutation(const char *path,enum vfs_backend *backend,const char **relative,char normalized[VFS_PATH_MAX+1u]) {
-    if(resolve_path(path,backend,relative,normalized)<0 || !**relative ||
-       (*backend!=VFS_BACKEND_RAM && *backend!=VFS_BACKEND_BREADFS) ||
-       str_len(*relative)>FS_NAME_MAX)return -1;
-    return 0;
-}
-int vfs_mkdir(const char *path) {
-    enum vfs_backend b;const char *r;char n[VFS_PATH_MAX+1u];
-    if(resolve_backend_mutation(path,&b,&r,n)<0)return -1;
-    return b==VFS_BACKEND_BREADFS?pfs_mkdir(r):fs_mkdir(r);
-}
-int vfs_unlink(const char *path) {
-    enum vfs_backend b;const char *r;char n[VFS_PATH_MAX+1u];
-    if(resolve_backend_mutation(path,&b,&r,n)<0)return -1;
-    return b==VFS_BACKEND_BREADFS?pfs_remove(r):fs_remove(r);
-}
-int vfs_rmdir(const char *path) {
-    enum vfs_backend b;const char *r;char n[VFS_PATH_MAX+1u];
-    if(resolve_backend_mutation(path,&b,&r,n)<0)return -1;
-    return b==VFS_BACKEND_BREADFS?pfs_rmdir(r):fs_rmdir(r);
-}
-int vfs_rename(const char *source,const char *destination) {
-    enum vfs_backend sb,db;const char *sr,*dr;
-    char sn[VFS_PATH_MAX+1u],dn[VFS_PATH_MAX+1u];
-    if(resolve_backend_mutation(source,&sb,&sr,sn)<0 ||
-       resolve_backend_mutation(destination,&db,&dr,dn)<0 || sb!=db)return -1;
-    return sb==VFS_BACKEND_BREADFS?pfs_move(sr,dr):fs_move(sr,dr);
-}
-
-int vfs_read_all(const char *path,void *buffer,size_t capacity,int binary) {
-    if(!buffer || !capacity)return -1;
-    int fd=vfs_open(path,VFS_O_READ|(binary?VFS_O_BINARY:0));
-    if(fd<0)return -1;
-    int total=0;
-    while((size_t)total<capacity) {
-        int n=vfs_read(fd,(uint8_t *)buffer+total,capacity-(size_t)total);
-        if(n<0){(void)vfs_close(fd);return -1;}
-        if(!n)break;
-        total+=n;
-    }
-    struct vfs_handle *h=handle_at(fd);
-    int truncated=h && h->position<h->size;
-    (void)vfs_close(fd);
-    if(truncated)return -2;
-    if(!binary && (size_t)total<capacity)((char *)buffer)[total]=0;
-    return total;
-}
-int vfs_write_all(const char *path,const void *buffer,size_t size,int binary) {
-    if((!buffer&&size) || size>VFS_FILE_MAX)return -1;
-    int fd=vfs_open(path,VFS_O_WRITE|VFS_O_CREATE|VFS_O_TRUNCATE|(binary?VFS_O_BINARY:0));
-    if(fd<0)return -1;
-    int written=vfs_write(fd,buffer,size);
-    if(written<0 || (size_t)written!=size){(void)vfs_close(fd);return -1;}
-    if(vfs_close(fd)<0)return -1;
-    return written;
-}
