@@ -198,3 +198,7 @@ uint32_t *task_schedule(uint32_t *frame) {
     return tasks[current_task].saved_stack;
 }
 
+
+uint32_t task_switch_count(void) {
+    return switches;
+}
