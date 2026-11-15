@@ -33,6 +33,10 @@ int main(void) {
 
     ipc_reset_task(4);
     assert(ipc_receive(4,received,sizeof(received),&sender)==-1);
+    assert(ipc_send(3,4,sent,4)==0);
+    runnable[3]=0;
+    ipc_remove_sender(3);
+    assert(ipc_receive(4,received,sizeof(received),&sender)==-1);
     runnable[4]=0;
     assert(ipc_send(3,4,sent,4)==-1);
     assert(ipc_receive(4,received,sizeof(received),&sender)==-1);
