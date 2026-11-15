@@ -309,3 +309,15 @@ int process_file_close(int descriptor) {
     p->file_descriptors[descriptor]=-1;
     return vfs_close(handle);
 }
+
+void process_close_files_current(void) {
+    struct process_record *p=process_current_record();
+    if(!p)return;
+    for(uint32_t fd=0;fd<PROCESS_FD_MAX;fd++) {
+        if(p->file_descriptors[fd]>=0) {
+            int handle=p->file_descriptors[fd];
+            p->file_descriptors[fd]=-1;
+            (void)vfs_close(handle);
+        }
+    }
+}
