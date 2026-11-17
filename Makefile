@@ -147,7 +147,7 @@ iso: $(BUILD)/breados.iso
 run: iso
 	test -f $(BUILD)/breados-disk.img || truncate -s 16M $(BUILD)/breados-disk.img
 	qemu-system-i386 -drive file=$(BUILD)/breados-disk.img,format=raw,if=ide,index=0 -cdrom $(BUILD)/breados.iso -serial stdio
-test: iso $(BUILD)/elf-loader-host-test $(BUILD)/pci-host-test $(BUILD)/audio-host-test $(BUILD)/heap-host-test $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/ipc-host-test $(BUILD)/vfs-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test $(BUILD)/theme-host-test $(BUILD)/menu-host-test $(BUILD)/notification-host-test $(BUILD)/clipboard-host-test $(BUILD)/reminder-host-test $(BUILD)/idle-host-test $(BUILD)/launcher-host-test $(BUILD)/privacy-host-test $(BUILD)/secure-memory-host-test
+test: iso $(BUILD)/elf-loader-host-test $(BUILD)/pci-host-test $(BUILD)/audio-host-test $(BUILD)/heap-host-test $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/ipc-host-test $(BUILD)/vfs-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test $(BUILD)/theme-host-test $(BUILD)/menu-host-test $(BUILD)/notification-host-test $(BUILD)/clipboard-host-test $(BUILD)/reminder-host-test $(BUILD)/idle-host-test $(BUILD)/launcher-host-test $(BUILD)/privacy-host-test $(BUILD)/secure-memory-host-test $(BUILD)/syscall-host-test
 	$(BUILD)/elf-loader-host-test
 	$(BUILD)/pci-host-test
 	$(BUILD)/audio-host-test
@@ -168,6 +168,7 @@ test: iso $(BUILD)/elf-loader-host-test $(BUILD)/pci-host-test $(BUILD)/audio-ho
 	$(BUILD)/launcher-host-test
 	$(BUILD)/privacy-host-test
 	$(BUILD)/secure-memory-host-test
+	$(BUILD)/syscall-host-test
 	bash tests/boot-smoke.sh
 clean:
 	rm -rf $(BUILD)
