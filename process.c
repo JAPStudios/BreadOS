@@ -192,6 +192,7 @@ void process_reap_zombies(void) {
         struct process_record *p=&processes[i];
         if (!p->used || !task_is_zombie(p->task_id)) continue;
         uint32_t id=p->task_id;
+        vfs_close_task(id);
         process_release_resources(p);
         (void)task_destroy(id);
     }
