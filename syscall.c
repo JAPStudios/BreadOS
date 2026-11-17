@@ -3,10 +3,12 @@
 #include "paging.h"
 #include "ipc.h"
 #include "console.h"
+#include "vfs.h"
 #include <stdint.h>
 
 #define SYSCALL_ERROR 0xFFFFFFFFu
 #define SYSCALL_WRITE_MAX 256u
+#define SYSCALL_IO_MAX 256u
 
 struct syscall_frame {
     uint32_t edi, esi, ebp, ignored_esp, ebx, edx, ecx, eax;
@@ -26,6 +28,16 @@ static int copy_from_user(void *destination,uint32_t source,uint32_t length) {
     uint8_t *output=(uint8_t *)destination;
     for (uint32_t i=0;i<length;i++) output[i]=input[i];
     return 0;
+}
+
+static int copy_user_string(char *destination,uint32_t source,uint32_t capacity) {
+    if (!destination || !capacity) return -1;
+    for (uint32_t i=0;i<capacity;i++) {
+        if (copy_from_user(&destination[i],source+i,1u)<0) return -1;
+        if (!destination[i]) return 0;
+    }
+    destination[capacity-1u]=0;
+    return -1;
 }
 
 static int copy_to_user(uint32_t destination,const void *source,uint32_t length) {
@@ -67,6 +79,64 @@ int syscall_dispatch(uint32_t *saved_frame) {
             console_put_char((char)output[i]);
         wipe_stack_buffer(output,sizeof(output));
         frame->eax=length;
+        return 0;
+    }
+
+    if (frame->eax==7u) {
+        char path[VFS_PATH_MAX+1u];
+        if (copy_user_string(path,frame->ebx,sizeof(path))<0) {
+            frame->eax=SYSCALL_ERROR;
+            return 0;
+        }
+        int handle=vfs_open(path,frame->ecx);
+        frame->eax=handle<0?SYSCALL_ERROR:(uint32_t)handle;
+        wipe_stack_buffer(path,sizeof(path));
+        return 0;
+    }
+
+    if (frame->eax==8u) {
+        frame->eax=vfs_close((int)frame->ebx)<0?SYSCALL_ERROR:0;
+        return 0;
+    }
+
+    if (frame->eax==9u) {
+        uint8_t input[SYSCALL_IO_MAX];
+        uint32_t length=frame->edx;
+        if (length>sizeof(input) ||
+            (length && !paging_user_range_valid(task_current_address_space(),
+                                                 frame->ecx,length,1))) {
+            frame->eax=SYSCALL_ERROR;
+            return 0;
+        }
+        int count=vfs_read((int)frame->ebx,input,length);
+        if (count<0 || (count && copy_to_user(frame->ecx,input,(uint32_t)count)<0)) {
+            wipe_stack_buffer(input,sizeof(input));
+            frame->eax=SYSCALL_ERROR;
+            return 0;
+        }
+        wipe_stack_buffer(input,sizeof(input));
+        frame->eax=(uint32_t)count;
+        return 0;
+    }
+
+    if (frame->eax==10u) {
+        uint8_t output[SYSCALL_IO_MAX];
+        uint32_t length=frame->edx;
+        if (length>sizeof(output) ||
+            (length && copy_from_user(output,frame->ecx,length)<0)) {
+            wipe_stack_buffer(output,sizeof(output));
+            frame->eax=SYSCALL_ERROR;
+            return 0;
+        }
+        int count=vfs_write((int)frame->ebx,output,length);
+        wipe_stack_buffer(output,sizeof(output));
+        frame->eax=count<0?SYSCALL_ERROR:(uint32_t)count;
+        return 0;
+    }
+
+    if (frame->eax==11u) {
+        frame->eax=vfs_seek((int)frame->ebx,(int32_t)frame->ecx,
+                            (int)frame->edx)<0?SYSCALL_ERROR:0;
         return 0;
     }
 
