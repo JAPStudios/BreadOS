@@ -46,6 +46,30 @@ int main(void) {
     for(uint32_t i=0;i<6;i++) assert(received[i]==sent[i]);
     assert(ipc_receive(4,received,sizeof(received),&sender)==-1);
 
+
+    /* Sender cleanup must preserve FIFO order when the ring has wrapped. */
+    runnable[3]=1;
+    ipc_reset_task(4);
+    sent[0]=10;
+    assert(ipc_send(3,4,sent,1)==0);
+    sent[0]=20;
+    assert(ipc_send(5,4,sent,1)==0);
+    sent[0]=30;
+    assert(ipc_send(3,4,sent,1)==0);
+    sent[0]=40;
+    assert(ipc_send(5,4,sent,1)==0);
+    assert(ipc_receive(4,received,1,&sender)==1 && sender==3 && received[0]==10);
+    assert(ipc_receive(4,received,1,&sender)==1 && sender==5 && received[0]==20);
+    sent[0]=50;
+    assert(ipc_send(3,4,sent,1)==0);
+    sent[0]=60;
+    assert(ipc_send(5,4,sent,1)==0);
+    runnable[3]=0;
+    ipc_remove_sender(3);
+    assert(ipc_receive(4,received,1,&sender)==1 && sender==5 && received[0]==40);
+    assert(ipc_receive(4,received,1,&sender)==1 && sender==5 && received[0]==60);
+    assert(ipc_receive(4,received,1,&sender)==-1);
+
     /* Resetting a recipient must discard its queued messages. */
     runnable[3]=1;
     assert(ipc_send(3,4,sent,4)==0);
