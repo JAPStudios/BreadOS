@@ -15,6 +15,7 @@ int main(void) {
     for(uint32_t i=0;i<sizeof(sent);i++) sent[i]=(uint8_t)(i+1u);
     runnable[3]=1;
     runnable[4]=1;
+    runnable[5]=1;
 
     assert(ipc_send(3,4,sent,IPC_MESSAGE_MAX)==0);
     assert(ipc_receive(4,received,IPC_MESSAGE_MAX,&sender)==IPC_MESSAGE_MAX);
@@ -33,10 +34,24 @@ int main(void) {
 
     ipc_reset_task(4);
     assert(ipc_receive(4,received,sizeof(received),&sender)==-1);
+
+    /* Removing one sender must preserve messages from every other sender. */
     assert(ipc_send(3,4,sent,4)==0);
+    assert(ipc_send(5,4,sent,6)==0);
+    assert(ipc_send(3,4,sent,8)==0);
     runnable[3]=0;
     ipc_remove_sender(3);
+    assert(ipc_receive(4,received,sizeof(received),&sender)==6);
+    assert(sender==5);
+    for(uint32_t i=0;i<6;i++) assert(received[i]==sent[i]);
     assert(ipc_receive(4,received,sizeof(received),&sender)==-1);
+
+    /* Resetting a recipient must discard its queued messages. */
+    runnable[3]=1;
+    assert(ipc_send(3,4,sent,4)==0);
+    ipc_reset_task(4);
+    assert(ipc_receive(4,received,sizeof(received),&sender)==-1);
+
     runnable[4]=0;
     assert(ipc_send(3,4,sent,4)==-1);
     assert(ipc_receive(4,received,sizeof(received),&sender)==-1);
