@@ -16,7 +16,7 @@ BreadOS is a freestanding 32-bit x86 operating system with its own kernel and na
 - Native clipboard history with sensitive-content exclusion and compiler-resistant memory wiping when clipboard contents are cleared, plus timer-based reminders delivered through the notification service.
 - Configurable desktop idle screensaver with a persistent timeout; keyboard or mouse activity wakes it. This is not an authenticated screen lock.
 - Native privacy permission policy for camera, microphone, location, network, Bluetooth, USB, and sensors; permissions default to denied and persist in BreadFS. This is a policy registry, not hardware isolation: device drivers and general user processes are not yet wired to enforce these permissions.
-- Host regression tests for filesystem metadata, binary storage, VFS mounts and file operations, ELF validation, PCI and audio helpers, keyboard input, mouse packets, task switching, user-task lifecycle, IPC queues, framebuffer rendering, themes, command search, notifications, clipboard history, reminders, privacy settings, secure memory, and idle timeout behavior, plus a QEMU boot/persistence smoke test.
+- Host regression tests for filesystem metadata, binary storage, VFS mounts and file operations, ELF validation, PCI and audio helpers, keyboard input, mouse packets, task switching, user-task lifecycle, IPC queues, framebuffer rendering, themes, command search, notifications, clipboard history, reminders, privacy settings, secure memory, and idle timeout behavior, plus a QEMU boot/persistence smoke test. Core IPC, VFS, ELF-loader, and filesystem host tests also run under AddressSanitizer and UndefinedBehaviorSanitizer in CI.
 
 ## Shell commands
 
