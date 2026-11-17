@@ -323,9 +323,8 @@ static void discard_handle(struct vfs_handle *h) {
     h->dirty=0;
     bytes_zero(h->data,sizeof(h->data));
 }
-int vfs_close(int handle) {
-    struct vfs_handle *h=handle_at(handle);
-    if(!h)return -1;
+static int finish_handle(struct vfs_handle *h) {
+    if(!h || !h->used) return -1;
     int result=0;
     if(h->dirty) {
         if(h->flags&VFS_O_BINARY)
@@ -342,11 +341,14 @@ int vfs_close(int handle) {
     return result<0?-1:0;
 }
 
+int vfs_close(int handle) {
+    return finish_handle(handle_at(handle));
+}
 
 void vfs_close_task(uint32_t task_id) {
     for(uint32_t i=0;i<VFS_OPEN_MAX;i++) {
         if(handles[i].used && handles[i].owner==task_id)
-            discard_handle(&handles[i]);
+            (void)finish_handle(&handles[i]);
     }
 }
 
