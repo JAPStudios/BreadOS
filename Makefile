@@ -39,7 +39,7 @@ $(BUILD)/elf_loader.o: elf_loader.c elf_loader.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/process.o: process.c process.h task.h memory.h paging.h syscall.h elf_loader.h vfs.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
-$(BUILD)/syscall.o: syscall.c syscall.h task.h console.h paging.h ipc.h | $(BUILD)
+$(BUILD)/syscall.o: syscall.c syscall.h task.h console.h paging.h ipc.h vfs.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/video.o: video.c video.h paging.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -125,6 +125,9 @@ $(BUILD)/secure-memory-host-test: tests/secure-memory-host.c secure_memory.c sec
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/secure-memory-host.c secure_memory.c -o $@
 $(BUILD)/video-host-test: tests/video-host.c video.c video.h paging.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/video-host.c video.c -o $@
+
+$(BUILD)/syscall-host-test: tests/syscall-host.c syscall.c syscall.h task.h paging.h ipc.h console.h vfs.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/syscall-host.c syscall.c -o $@
 
 $(BUILD)/ipc-host-sanitize-test: tests/ipc-host.c ipc.c ipc.h task.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/ipc-host.c ipc.c -o $@
