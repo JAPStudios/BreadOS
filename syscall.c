@@ -31,7 +31,7 @@ static int copy_from_user(void *destination,uint32_t source,uint32_t length) {
 }
 
 static int copy_user_string(char *destination,uint32_t source,uint32_t capacity) {
-    if (!destination || !capacity) return -1;
+    if (!destination || !capacity || source>0xFFFFFFFFu-(capacity-1u)) return -1;
     for (uint32_t i=0;i<capacity;i++) {
         if (copy_from_user(&destination[i],source+i,1u)<0) return -1;
         if (!destination[i]) return 0;
