@@ -24,6 +24,7 @@ struct vfs_handle {
     uint8_t device;
     uint8_t reserved;
     uint32_t flags;
+    uint32_t owner;
     enum vfs_backend backend;
     uint32_t position;
     uint32_t size;
@@ -254,7 +255,8 @@ static int proc_name(const char *path) {
            str_eq(path,"meminfo") || str_eq(path,"tasks");
 }
 static struct vfs_handle *handle_at(int handle) {
-    if (handle<0 || (uint32_t)handle>=VFS_OPEN_MAX || !handles[handle].used) return 0;
+    if (handle<0 || (uint32_t)handle>=VFS_OPEN_MAX || !handles[handle].used ||
+        handles[handle].owner!=task_current_id()) return 0;
     return &handles[handle];
 }
 
@@ -271,7 +273,8 @@ int vfs_open(const char *path,uint32_t flags) {
     for(uint32_t i=0;i<VFS_OPEN_MAX;i++) if(!handles[i].used){slot=(int)i;break;}
     if(slot<0) return -1;
     struct vfs_handle *h=&handles[slot];
-    h->backend=backend;h->flags=flags;h->position=0;h->size=0;h->dirty=0;h->device=0;
+    h->backend=backend;h->flags=flags;h->owner=task_current_id();
+    h->position=0;h->size=0;h->dirty=0;h->device=0;
     bytes_copy(h->path,relative,str_len(relative)+1u);
     if(backend==VFS_BACKEND_DEV) {
         h->device=(uint8_t)device_id(relative);
@@ -339,6 +342,13 @@ int vfs_close(int handle) {
     return result<0?-1:0;
 }
 
+
+void vfs_close_task(uint32_t task_id) {
+    for(uint32_t i=0;i<VFS_OPEN_MAX;i++) {
+        if(handles[i].used && handles[i].owner==task_id)
+            discard_handle(&handles[i]);
+    }
+}
 
 int vfs_read(int handle,void *buffer,size_t count) {
     struct vfs_handle *h=handle_at(handle);
