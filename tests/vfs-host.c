@@ -12,6 +12,8 @@
 
 static char console_output[64];
 static size_t console_length;
+static uint32_t active_task_id;
+uint32_t task_current_id(void){return active_task_id;}
 int pfs_init(void){return 0;}
 int pfs_ready(void){return 0;}
 size_t pfs_count(void){return 0;}
@@ -84,6 +86,18 @@ int main(void) {
     handles[1]=vfs_open("/empty.txt",VFS_O_READ);
     assert(handles[1]>=0);
     for(unsigned i=0;i<VFS_OPEN_MAX;i++) assert(vfs_close(handles[i])==0);
+
+    /* Handles are private to their creating task and are discarded on exit. */
+    active_task_id=3;
+    fd=vfs_open("/empty.txt",VFS_O_READ);
+    assert(fd>=0);
+    active_task_id=4;
+    assert(vfs_read(fd,buffer,1)<0);
+    assert(vfs_close(fd)<0);
+    vfs_close_task(3);
+    active_task_id=3;
+    assert(vfs_read(fd,buffer,1)<0);
+    active_task_id=0;
 
     /* Invalid device opens must not consume a descriptor. */
     assert(vfs_open("/dev/not-a-device",VFS_O_READ)<0);
