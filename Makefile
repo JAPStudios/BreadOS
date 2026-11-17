@@ -131,13 +131,16 @@ $(BUILD)/syscall-host-test: tests/syscall-host.c syscall.c syscall.h task.h pagi
 
 $(BUILD)/ipc-host-sanitize-test: tests/ipc-host.c ipc.c ipc.h task.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/ipc-host.c ipc.c -o $@
+$(BUILD)/syscall-host-sanitize-test: tests/syscall-host.c syscall.c syscall.h task.h paging.h ipc.h console.h vfs.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/syscall-host.c syscall.c -o $@
 $(BUILD)/vfs-host-sanitize-test: tests/vfs-host.c vfs.c fs.c vfs.h fs.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/vfs-host.c vfs.c fs.c -o $@
 $(BUILD)/elf-loader-host-sanitize-test: tests/elf-loader-host.c elf_loader.c elf_loader.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/elf-loader-host.c elf_loader.c -o $@
 $(BUILD)/filesystem-host-sanitize-test: tests/filesystem-host.c fs.c pfs.c fs.h pfs.h ata.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/filesystem-host.c fs.c pfs.c -o $@
-test-sanitize: $(BUILD)/ipc-host-sanitize-test $(BUILD)/vfs-host-sanitize-test $(BUILD)/elf-loader-host-sanitize-test $(BUILD)/filesystem-host-sanitize-test
+test-sanitize: $(BUILD)/syscall-host-sanitize-test $(BUILD)/ipc-host-sanitize-test $(BUILD)/vfs-host-sanitize-test $(BUILD)/elf-loader-host-sanitize-test $(BUILD)/filesystem-host-sanitize-test
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $(BUILD)/syscall-host-sanitize-test
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $(BUILD)/ipc-host-sanitize-test
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $(BUILD)/vfs-host-sanitize-test
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $(BUILD)/elf-loader-host-sanitize-test
