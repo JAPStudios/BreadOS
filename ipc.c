@@ -91,6 +91,9 @@ void ipc_remove_sender(uint32_t task_id) {
             clear_message(&box->messages[i]);
         for (uint32_t i=0;i<kept_count;i++)
             box->messages[i]=kept[i];
+        /* The compaction buffer temporarily holds live IPC payloads. */
+        volatile uint8_t *temporary=(volatile uint8_t *)kept;
+        for (uint32_t i=0;i<sizeof(kept);i++) temporary[i]=0;
         box->head=0;
         box->count=(uint8_t)kept_count;
     }
