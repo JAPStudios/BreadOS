@@ -99,6 +99,16 @@ int main(void) {
     assert(vfs_read(fd,buffer,1)<0);
     active_task_id=0;
 
+    /* Process exit closes owned handles and commits completed file writes. */
+    active_task_id=3;
+    fd=vfs_open("/exit.txt",VFS_O_WRITE|VFS_O_CREATE|VFS_O_TRUNCATE);
+    assert(fd>=0 && vfs_write(fd,"saved",5)==5);
+    active_task_id=4;
+    vfs_close_task(3);
+    active_task_id=0;
+    assert(vfs_read_all("/exit.txt",buffer,sizeof(buffer),0)==5);
+    assert(strcmp(buffer,"saved")==0);
+
     /* Invalid device opens must not consume a descriptor. */
     assert(vfs_open("/dev/not-a-device",VFS_O_READ)<0);
     fd=vfs_open("/empty.txt",VFS_O_READ);
