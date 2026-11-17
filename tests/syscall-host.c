@@ -86,6 +86,7 @@ int main(void) {
     assert(syscall_dispatch((uint32_t *)&frame)==0);
     assert(terminate_calls==2);
 
+    terminate_result=0;
     frame=frame_for(5u);
     assert(syscall_abort_user_exception((uint32_t *)&frame,13u,0u)==1);
     assert(syscall_abort_user_exception((uint32_t *)&frame,2u,0u)==0);
