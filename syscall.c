@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #define SYSCALL_ERROR 0xFFFFFFFFu
+#define SYSCALL_WRITE_MAX 256u
 
 struct syscall_frame {
     uint32_t edi, esi, ebp, ignored_esp, ebx, edx, ecx, eax;
@@ -51,6 +52,23 @@ int syscall_dispatch(uint32_t *saved_frame) {
     }
     if (frame->eax==2u)
         return task_terminate_current((int)frame->ebx)==0;
+
+    /* Write a bounded byte string from the caller's own mapped address space. */
+    if (frame->eax==6u) {
+        uint8_t output[SYSCALL_WRITE_MAX];
+        uint32_t length=frame->edx;
+        if (!length || length>sizeof(output) ||
+            copy_from_user(output,frame->ebx,length)<0) {
+            wipe_stack_buffer(output,sizeof(output));
+            frame->eax=SYSCALL_ERROR;
+            return 0;
+        }
+        for (uint32_t i=0;i<length;i++)
+            console_put_char((char)output[i]);
+        wipe_stack_buffer(output,sizeof(output));
+        frame->eax=length;
+        return 0;
+    }
 
     if (frame->eax==3u) {
         uint8_t message[IPC_MESSAGE_MAX];
