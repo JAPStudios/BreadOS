@@ -73,6 +73,23 @@ int main(void) {
     assert(vfs_read(fd,buffer,1)==0);
     assert(vfs_close(fd)==0);
 
+    /* The fixed VFS handle table must reject overflow and recover on close. */
+    int handles[VFS_OPEN_MAX];
+    for(unsigned i=0;i<VFS_OPEN_MAX;i++) {
+        handles[i]=vfs_open("/empty.txt",VFS_O_READ);
+        assert(handles[i]>=0);
+    }
+    assert(vfs_open("/empty.txt",VFS_O_READ)<0);
+    assert(vfs_close(handles[1])==0);
+    handles[1]=vfs_open("/empty.txt",VFS_O_READ);
+    assert(handles[1]>=0);
+    for(unsigned i=0;i<VFS_OPEN_MAX;i++) assert(vfs_close(handles[i])==0);
+
+    /* Invalid device opens must not consume a descriptor. */
+    assert(vfs_open("/dev/not-a-device",VFS_O_READ)<0);
+    fd=vfs_open("/empty.txt",VFS_O_READ);
+    assert(fd>=0 && vfs_close(fd)==0);
+
     fd=vfs_open("/dev/null",VFS_O_WRITE);
     assert(fd>=0 && vfs_write(fd,"discard",7)==7 && vfs_close(fd)==0);
     fd=vfs_open("/dev/zero",VFS_O_READ);
