@@ -5,7 +5,7 @@ HOSTCC ?= cc
 CFLAGS = -m32 -std=gnu11 -ffreestanding -fno-builtin -fno-pie -fno-stack-protector -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -msoft-float -Wall -Wextra -Werror -O2
 LDFLAGS = -m elf_i386 -T linker.ld -nostdlib
 BUILD = build
-.PHONY: all iso run test clean
+.PHONY: all iso run test test-sanitize clean
 all: iso
 $(BUILD):
 	mkdir -p $(BUILD)
@@ -125,6 +125,21 @@ $(BUILD)/secure-memory-host-test: tests/secure-memory-host.c secure_memory.c sec
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/secure-memory-host.c secure_memory.c -o $@
 $(BUILD)/video-host-test: tests/video-host.c video.c video.h paging.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/video-host.c video.c -o $@
+
+$(BUILD)/ipc-host-sanitize-test: tests/ipc-host.c ipc.c ipc.h task.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/ipc-host.c ipc.c -o $@
+$(BUILD)/vfs-host-sanitize-test: tests/vfs-host.c vfs.c fs.c vfs.h fs.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/vfs-host.c vfs.c fs.c -o $@
+$(BUILD)/elf-loader-host-sanitize-test: tests/elf-loader-host.c elf_loader.c elf_loader.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/elf-loader-host.c elf_loader.c -o $@
+$(BUILD)/filesystem-host-sanitize-test: tests/filesystem-host.c fs.c pfs.c fs.h pfs.h ata.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/filesystem-host.c fs.c pfs.c -o $@
+test-sanitize: $(BUILD)/ipc-host-sanitize-test $(BUILD)/vfs-host-sanitize-test $(BUILD)/elf-loader-host-sanitize-test $(BUILD)/filesystem-host-sanitize-test
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $(BUILD)/ipc-host-sanitize-test
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $(BUILD)/vfs-host-sanitize-test
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $(BUILD)/elf-loader-host-sanitize-test
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $(BUILD)/filesystem-host-sanitize-test
+
 iso: $(BUILD)/breados.iso
 run: iso
 	test -f $(BUILD)/breados-disk.img || truncate -s 16M $(BUILD)/breados-disk.img
