@@ -8,6 +8,7 @@ void _start(void) {
     static const char wrong_id[]="FAIL: victim task ID was not 3.\n";
     static const char wrong_sender[]="FAIL: victim received IPC from the wrong task.\n";
     static const char modified[]="FAIL: another user process modified victim memory.\n";
+    static const char received[]="victim received IPC.\n";
     char message[1]={0};
     uint32_t sender=0;
     uint32_t id=bread_task_id();
@@ -22,7 +23,7 @@ void _start(void) {
     for(;;) {
         if(bread_receive(message,sizeof(message),&sender)>=0) break;
     }
-    (void)bread_write("victim received IPC.\\n",21u);
+    (void)bread_write(received,(uint32_t)(sizeof(received)-1u));
     if(sender!=4u) {
         (void)bread_write(wrong_sender,(uint32_t)(sizeof(wrong_sender)-1u));
         bread_exit(1);
