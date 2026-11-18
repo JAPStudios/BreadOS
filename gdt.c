@@ -60,6 +60,14 @@ void gdt_set_kernel_stack(uint32_t stack_pointer) {
     tss.esp0 = stack_pointer;
 }
 
+/* The i386 user CS limit is rounded to 4 KiB pages by the G bit. */
+void gdt_set_user_code_limit(uint32_t inclusive_limit) {
+    uint32_t encoded=inclusive_limit>>12;
+    gdt[3].limit_low=(uint16_t)(encoded&0xFFFFu);
+    gdt[3].granularity=(uint8_t)((gdt[3].granularity&0xF0u)|
+                                  ((encoded>>16)&0x0Fu));
+}
+
 void gdt_init(void) {
     for (unsigned i = 0; i < GDT_ENTRIES; ++i) {
         set_entry(i, 0, 0, 0, 0);
