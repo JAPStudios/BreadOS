@@ -7,7 +7,9 @@ void ipc_remove_sender(uint32_t task_id) { (void)task_id; }
 static uint32_t active_directory;
 static uint32_t kernel_switches;
 static uint32_t active_kernel_stack;
+static uint32_t active_user_code_limit;
 void gdt_set_kernel_stack(uint32_t stack_top) { active_kernel_stack = stack_top; }
+void gdt_set_user_code_limit(uint32_t limit) { active_user_code_limit = limit; }
 int paging_switch_address_space(const struct paging_address_space *space) {
     if (!space || !space->directory_physical || !space->user_table_physical) return -1;
     active_directory = space->directory_physical;
@@ -61,7 +63,9 @@ int main(void) {
     assert(task_switch_count() == 6);
     assert(kernel_switches == 4);
 
-    int id = task_create_user(user_frame, &user_space, 0x5000u);
+    assert(task_create_user(user_frame,&user_space,0x5000u,0x3FFFFFFFu)==-1);
+    assert(task_create_user(user_frame,&user_space,0x5000u,0x40400000u)==-1);
+    int id = task_create_user(user_frame, &user_space, 0x5000u, 0x40001FFFu);
     assert(id == 3);
     assert(task_schedule(shell_frame) == worker_a_frame);
     assert(task_schedule(worker_a_frame) == worker_b_frame);
@@ -69,6 +73,7 @@ int main(void) {
     assert(task_current_id() == (uint32_t)id);
     assert(active_directory == user_space.directory_physical);
     assert(active_kernel_stack == 0x5000u);
+    assert(active_user_code_limit == 0x40001FFFu);
 
     assert(task_terminate_current(9) == 0);
     assert(task_is_zombie((uint32_t)id));
@@ -79,11 +84,12 @@ int main(void) {
     assert(task_destroy((uint32_t)id) == 0);
     assert(!task_is_zombie((uint32_t)id));
 
-    int reused = task_create_user(user_frame, &user_space, 0x6000u);
+    int reused = task_create_user(user_frame, &user_space, 0x6000u, 0x40002FFFu);
     assert(reused == id);
     assert(task_schedule(shell_frame) == worker_a_frame);
     assert(task_schedule(worker_a_frame) == worker_b_frame);
     assert(task_schedule(worker_b_frame) == user_frame);
+    assert(active_user_code_limit == 0x40002FFFu);
     assert(task_terminate_current(-11) == 0);
     assert(task_schedule(user_frame) == shell_frame);
     assert(task_exit_code((uint32_t)reused) == -11);

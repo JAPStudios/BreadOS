@@ -2,9 +2,9 @@
 set -euo pipefail
 mkdir -p build
 # Create a fresh persistent volume containing the compiled native user application.
-build/mk-breadfs-image build/breados-disk.img build/user/hello.elf build/user/guard.elf build/user/victim.elf build/user/attacker.elf
+build/mk-breadfs-image build/breados-disk.img build/user/hello.elf build/user/guard.elf build/user/victim.elf build/user/attacker.elf build/user/wxguard.elf
 rm -f build/qemu-monitor.sock
-timeout 20s qemu-system-i386 -display none \
+timeout 24s qemu-system-i386 -display none \
   -monitor unix:build/qemu-monitor.sock,server,nowait -no-reboot -no-shutdown \
   -serial stdio -drive file=build/breados-disk.img,format=raw,if=ide,index=0 \
   -cdrom build/breados.iso > build/qemu-serial.log 2>&1 &
@@ -93,6 +93,14 @@ if not wait_for_text("PASS: another user process could not modify victim memory.
 send_text("help\n")
 if not wait_for_text("Commands: help, menu"):
     fail("Kernel shell did not remain responsive after the process-isolation test")
+
+# Writable data must not be executable even though this i386 target lacks NX.
+send_text("exec wxguard\n")
+if not wait_for_text("W^X test: attempting to execute writable data."):
+    fail("W^X test application did not start")
+send_text("help\n")
+if not wait_for_text("Commands: help, menu"):
+    fail("Kernel shell did not recover after the writable-execution fault")
 monitor.close()
 PY
 set +e
@@ -114,7 +122,9 @@ grep -F "BreadOS native user-mode application." build/qemu-serial.log
 grep -F "BreadOS isolation test: attempting protected supervisor-memory write." build/qemu-serial.log
 grep -F "Commands: help, menu" build/qemu-serial.log
 grep -F "PASS: another user process could not modify victim memory." build/qemu-serial.log
-if grep -Fq "FAIL: another user process modified victim memory." build/qemu-serial.log || grep -Fq "FAIL: attacker could not send IPC to victim." build/qemu-serial.log; then
+grep -F "W^X test: attempting to execute writable data." build/qemu-serial.log
+grep -F "Commands: help, menu" build/qemu-serial.log
+if grep -Fq "FAIL: another user process modified victim memory." build/qemu-serial.log || grep -Fq "FAIL: attacker could not send IPC to victim." build/qemu-serial.log || grep -Fq "FAIL: writable data executed as code." build/qemu-serial.log; then
   echo "User processes were not isolated correctly." >&2
   exit 1
 fi

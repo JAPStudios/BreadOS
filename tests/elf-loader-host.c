@@ -24,6 +24,9 @@ int main(void) {
     make_image();
     assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==0);
     assert(parsed.entry==ELF32_USER_START);
+    uint32_t code_limit=0;
+    assert(elf32_user_code_limit(&parsed,&code_limit)==0);
+    assert(code_limit==ELF32_USER_START+4095u);
     assert(elf32_load_segment_at(&parsed,0,&segment)==0);
     assert(segment.offset==4096 && segment.file_size==4 && segment.memory_size==4096);
     assert(elf32_load_segment_at(&parsed,1,&segment)==-1);
@@ -36,6 +39,23 @@ int main(void) {
     make_image();put32(76,7);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
     make_image();put32(24,ELF32_USER_START+0x1000);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
     make_image();put32(28,0xFFFFFFF0);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+    /* A writable segment may start at the page immediately after executable pages. */
+    make_image();put16(44,2);
+    put32(84,1);put32(88,8192);put32(92,ELF32_USER_START+4096u);
+    put32(96,ELF32_USER_START+4096u);put32(100,0);put32(104,4);
+    put32(108,6);put32(112,4096);
+    assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==0);
+    assert(elf32_user_code_limit(&parsed,&code_limit)==0);
+    assert(code_limit==ELF32_USER_START+4095u);
+
+    /* Writable memory below the executable range cannot be covered by user CS. */
+    make_image();put16(44,2);put32(24,ELF32_USER_START+4096u);
+    put32(76,6);
+    put32(84,1);put32(88,8192);put32(92,ELF32_USER_START+4096u);
+    put32(96,ELF32_USER_START+4096u);put32(100,4);put32(104,4096);
+    put32(108,5);put32(112,4096);
+    assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
+
     /* Program headers must not alias the ELF file header. */
     make_image();put32(28,40);assert(elf32_inspect(image_bytes,sizeof(image_bytes),&parsed)==-1);
     /* p_align must be a power of two and satisfy p_vaddr/p_offset congruence. */

@@ -8,4 +8,7 @@ void gdt_init(void);
 /* Kernel stack top used by the CPU when entering from ring 3. */
 void gdt_set_kernel_stack(uint32_t stack_pointer);
 
+/* Restrict ring-3 instruction fetches to the executable ELF address range. */
+void gdt_set_user_code_limit(uint32_t inclusive_limit);
+
 #endif
