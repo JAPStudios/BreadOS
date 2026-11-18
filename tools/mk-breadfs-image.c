@@ -7,6 +7,13 @@
 
 #define IMAGE_SECTOR_SIZE 512u
 #define IMAGE_SECTOR_COUNT 32768u
+#define APP_COUNT 4u
+
+struct app_image {
+    const char *name;
+    uint8_t *bytes;
+    size_t size;
+};
 
 static FILE *image_file;
 
@@ -66,34 +73,36 @@ static int verify_binary(const char *path,const uint8_t *expected,size_t size) {
 }
 
 int main(int argc,char **argv) {
-    if(argc!=4) {
-        fprintf(stderr,"Usage: %s OUTPUT_DISK_IMAGE HELLO_ELF GUARD_ELF\n",argv[0]);
+    static const char *const names[APP_COUNT]={"hello","guard","victim","attacker"};
+    struct app_image apps[APP_COUNT];
+    for(uint32_t i=0;i<APP_COUNT;i++) {
+        apps[i].name=names[i];
+        apps[i].bytes=0;
+        apps[i].size=0;
+    }
+    if(argc!=(int)(APP_COUNT+2u)) {
+        fprintf(stderr,"Usage: %s OUTPUT_DISK_IMAGE HELLO_ELF GUARD_ELF VICTIM_ELF ATTACKER_ELF\n",argv[0]);
         return 2;
     }
-
-    uint8_t *hello=0,*guard=0;
-    size_t hello_size=0,guard_size=0;
-    if(load_file(argv[2],&hello,&hello_size)!=0 ||
-       load_file(argv[3],&guard,&guard_size)!=0) {
-        fprintf(stderr,"Could not read both user ELF files (maximum 65535 bytes each).\n");
-        free(hello);
-        free(guard);
-        return 1;
+    for(uint32_t i=0;i<APP_COUNT;i++) {
+        if(load_file(argv[i+2u],&apps[i].bytes,&apps[i].size)!=0) {
+            fprintf(stderr,"Could not read user ELF: %s\n",argv[i+2u]);
+            for(uint32_t j=0;j<APP_COUNT;j++) free(apps[j].bytes);
+            return 1;
+        }
     }
 
     image_file=fopen(argv[1],"w+b");
     if(!image_file) {
         perror("Could not create disk image");
-        free(hello);
-        free(guard);
+        for(uint32_t i=0;i<APP_COUNT;i++) free(apps[i].bytes);
         return 1;
     }
     if(fseek(image_file,(long)IMAGE_SECTOR_COUNT*IMAGE_SECTOR_SIZE-1L,SEEK_SET)!=0 ||
        fputc(0,image_file)==EOF || fflush(image_file)!=0) {
         fprintf(stderr,"Could not size the BreadFS disk image.\n");
         fclose(image_file);
-        free(hello);
-        free(guard);
+        for(uint32_t i=0;i<APP_COUNT;i++) free(apps[i].bytes);
         return 1;
     }
 
@@ -101,30 +110,38 @@ int main(int argc,char **argv) {
     if(formatted!=2 || !pfs_ready()) {
         fprintf(stderr,"BreadFS did not format the new image (status %d).\n",formatted);
         fclose(image_file);
-        free(hello);
-        free(guard);
+        for(uint32_t i=0;i<APP_COUNT;i++) free(apps[i].bytes);
         return 1;
     }
-    if(pfs_write_binary("hello",hello,hello_size)!=(int)hello_size ||
-       pfs_write_binary("guard",guard,guard_size)!=(int)guard_size ||
-       pfs_init()!=1 || !pfs_ready() ||
-       verify_binary("hello",hello,hello_size)!=0 ||
-       verify_binary("guard",guard,guard_size)!=0) {
-        fprintf(stderr,"BreadFS application install or read-back verification failed.\n");
+    for(uint32_t i=0;i<APP_COUNT;i++) {
+        if(pfs_write_binary(apps[i].name,apps[i].bytes,apps[i].size)!=(int)apps[i].size) {
+            fprintf(stderr,"Could not install /%s into BreadFS.\n",apps[i].name);
+            fclose(image_file);
+            for(uint32_t j=0;j<APP_COUNT;j++) free(apps[j].bytes);
+            return 1;
+        }
+    }
+    if(pfs_init()!=1 || !pfs_ready()) {
+        fprintf(stderr,"BreadFS failed to remount after application installation.\n");
         fclose(image_file);
-        free(hello);
-        free(guard);
+        for(uint32_t i=0;i<APP_COUNT;i++) free(apps[i].bytes);
         return 1;
+    }
+    for(uint32_t i=0;i<APP_COUNT;i++) {
+        if(verify_binary(apps[i].name,apps[i].bytes,apps[i].size)!=0) {
+            fprintf(stderr,"BreadFS read-back verification failed for /%s.\n",apps[i].name);
+            fclose(image_file);
+            for(uint32_t j=0;j<APP_COUNT;j++) free(apps[j].bytes);
+            return 1;
+        }
     }
 
-    free(hello);
-    free(guard);
+    for(uint32_t i=0;i<APP_COUNT;i++) free(apps[i].bytes);
     if(fclose(image_file)!=0) {
         fprintf(stderr,"Could not finalize disk image.\n");
         return 1;
     }
     image_file=0;
-    printf("Created 16 MiB BreadFS image with /hello (%lu bytes) and /guard (%lu bytes).\n",
-           (unsigned long)hello_size,(unsigned long)guard_size);
+    printf("Created 16 MiB BreadFS image with four verified ELF32 applications.\n");
     return 0;
 }
