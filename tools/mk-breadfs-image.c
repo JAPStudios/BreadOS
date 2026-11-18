@@ -7,7 +7,7 @@
 
 #define IMAGE_SECTOR_SIZE 512u
 #define IMAGE_SECTOR_COUNT 32768u
-#define APP_COUNT 4u
+#define APP_COUNT 5u
 
 struct app_image {
     const char *name;
@@ -73,7 +73,7 @@ static int verify_binary(const char *path,const uint8_t *expected,size_t size) {
 }
 
 int main(int argc,char **argv) {
-    static const char *const names[APP_COUNT]={"hello","guard","victim","attacker"};
+    static const char *const names[APP_COUNT]={"hello","guard","victim","attacker","wxguard"};
     struct app_image apps[APP_COUNT];
     for(uint32_t i=0;i<APP_COUNT;i++) {
         apps[i].name=names[i];
@@ -81,7 +81,7 @@ int main(int argc,char **argv) {
         apps[i].size=0;
     }
     if(argc!=(int)(APP_COUNT+2u)) {
-        fprintf(stderr,"Usage: %s OUTPUT_DISK_IMAGE HELLO_ELF GUARD_ELF VICTIM_ELF ATTACKER_ELF\n",argv[0]);
+        fprintf(stderr,"Usage: %s OUTPUT_DISK_IMAGE HELLO_ELF GUARD_ELF VICTIM_ELF ATTACKER_ELF WXGUARD_ELF\n",argv[0]);
         return 2;
     }
     for(uint32_t i=0;i<APP_COUNT;i++) {
@@ -142,6 +142,6 @@ int main(int argc,char **argv) {
         return 1;
     }
     image_file=0;
-    printf("Created 16 MiB BreadFS image with four verified ELF32 applications.\n");
+    printf("Created 16 MiB BreadFS image with five verified ELF32 applications.\n");
     return 0;
 }
