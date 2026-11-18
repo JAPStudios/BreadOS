@@ -156,11 +156,14 @@ test-sanitize: $(BUILD)/syscall-host-sanitize-test $(BUILD)/ipc-host-sanitize-te
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $(BUILD)/elf-loader-host-sanitize-test
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $(BUILD)/filesystem-host-sanitize-test
 
+$(BUILD)/mk-breadfs-image: tools/mk-breadfs-image.c pfs.c pfs.h ata.h fs.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tools/mk-breadfs-image.c pfs.c -o $@
+
 iso: $(BUILD)/breados.iso
-run: iso
-	test -f $(BUILD)/breados-disk.img || truncate -s 16M $(BUILD)/breados-disk.img
+run: iso user-apps $(BUILD)/mk-breadfs-image
+	test -f $(BUILD)/breados-disk.img || $(BUILD)/mk-breadfs-image $(BUILD)/breados-disk.img $(BUILD)/user/hello.elf
 	qemu-system-i386 -drive file=$(BUILD)/breados-disk.img,format=raw,if=ide,index=0 -cdrom $(BUILD)/breados.iso -serial stdio
-test: iso user-apps $(BUILD)/user-app-elf-host-test $(BUILD)/elf-loader-host-test $(BUILD)/pci-host-test $(BUILD)/audio-host-test $(BUILD)/heap-host-test $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/ipc-host-test $(BUILD)/vfs-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test $(BUILD)/theme-host-test $(BUILD)/menu-host-test $(BUILD)/notification-host-test $(BUILD)/clipboard-host-test $(BUILD)/reminder-host-test $(BUILD)/idle-host-test $(BUILD)/launcher-host-test $(BUILD)/privacy-host-test $(BUILD)/secure-memory-host-test $(BUILD)/syscall-host-test
+test: iso user-apps $(BUILD)/mk-breadfs-image $(BUILD)/user-app-elf-host-test $(BUILD)/elf-loader-host-test $(BUILD)/pci-host-test $(BUILD)/audio-host-test $(BUILD)/heap-host-test $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/ipc-host-test $(BUILD)/vfs-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test $(BUILD)/theme-host-test $(BUILD)/menu-host-test $(BUILD)/notification-host-test $(BUILD)/clipboard-host-test $(BUILD)/reminder-host-test $(BUILD)/idle-host-test $(BUILD)/launcher-host-test $(BUILD)/privacy-host-test $(BUILD)/secure-memory-host-test $(BUILD)/syscall-host-test
 	$(BUILD)/user-app-elf-host-test $(BUILD)/user/hello.elf
 	$(BUILD)/elf-loader-host-test
 	$(BUILD)/pci-host-test
