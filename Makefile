@@ -2,11 +2,12 @@ CC = gcc
 AS = as
 LD = ld
 HOSTCC ?= cc
+USER_CFLAGS = -m32 -std=c11 -ffreestanding -fno-pie -fno-pic -fno-stack-protector -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -msoft-float -Wall -Wextra -Werror -O2
 CFLAGS = -m32 -std=gnu11 -ffreestanding -fno-builtin -fno-pie -fno-stack-protector -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -msoft-float -Wall -Wextra -Werror -O2
 LDFLAGS = -m elf_i386 -T linker.ld -nostdlib
 BUILD = build
-.PHONY: all iso run test test-sanitize clean
-all: iso
+.PHONY: all iso user-apps run test test-sanitize clean
+all: iso user-apps
 $(BUILD):
 	mkdir -p $(BUILD)
 $(BUILD)/boot.o: boot.s | $(BUILD)
@@ -85,6 +86,15 @@ $(BUILD)/breados.iso: $(BUILD)/kernel.elf grub.cfg
 	cp $(BUILD)/kernel.elf $(BUILD)/iso/boot/kernel.elf
 	cp grub.cfg $(BUILD)/iso/boot/grub/grub.cfg
 	grub-mkrescue -o $@ $(BUILD)/iso
+$(BUILD)/user/hello.elf: user/examples/hello.c user/include/breados/syscall.h user/linker.ld | $(BUILD)
+	mkdir -p $(BUILD)/user
+	$(CC) $(USER_CFLAGS) -Iuser/include -c user/examples/hello.c -o $(BUILD)/user/hello.o
+	$(LD) -m elf_i386 -z max-page-size=0x1000 -T user/linker.ld -nostdlib -o $@ $(BUILD)/user/hello.o
+user-apps: $(BUILD)/user/hello.elf
+
+$(BUILD)/user-app-elf-host-test: tests/user-app-elf-host.c elf_loader.c elf_loader.h | $(BUILD)
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/user-app-elf-host.c elf_loader.c -o $@
+
 $(BUILD)/pci-host-test: tests/pci-host.c pci.c pci.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/pci-host.c pci.c -o $@
 $(BUILD)/audio-host-test: tests/audio-host.c audio.c audio.h | $(BUILD)
@@ -150,7 +160,8 @@ iso: $(BUILD)/breados.iso
 run: iso
 	test -f $(BUILD)/breados-disk.img || truncate -s 16M $(BUILD)/breados-disk.img
 	qemu-system-i386 -drive file=$(BUILD)/breados-disk.img,format=raw,if=ide,index=0 -cdrom $(BUILD)/breados.iso -serial stdio
-test: iso $(BUILD)/elf-loader-host-test $(BUILD)/pci-host-test $(BUILD)/audio-host-test $(BUILD)/heap-host-test $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/ipc-host-test $(BUILD)/vfs-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test $(BUILD)/theme-host-test $(BUILD)/menu-host-test $(BUILD)/notification-host-test $(BUILD)/clipboard-host-test $(BUILD)/reminder-host-test $(BUILD)/idle-host-test $(BUILD)/launcher-host-test $(BUILD)/privacy-host-test $(BUILD)/secure-memory-host-test $(BUILD)/syscall-host-test
+test: iso user-apps $(BUILD)/user-app-elf-host-test $(BUILD)/elf-loader-host-test $(BUILD)/pci-host-test $(BUILD)/audio-host-test $(BUILD)/heap-host-test $(BUILD)/filesystem-host-test $(BUILD)/keyboard-host-test $(BUILD)/task-host-test $(BUILD)/ipc-host-test $(BUILD)/vfs-host-test $(BUILD)/video-host-test $(BUILD)/mouse-host-test $(BUILD)/theme-host-test $(BUILD)/menu-host-test $(BUILD)/notification-host-test $(BUILD)/clipboard-host-test $(BUILD)/reminder-host-test $(BUILD)/idle-host-test $(BUILD)/launcher-host-test $(BUILD)/privacy-host-test $(BUILD)/secure-memory-host-test $(BUILD)/syscall-host-test
+	$(BUILD)/user-app-elf-host-test $(BUILD)/user/hello.elf
 	$(BUILD)/elf-loader-host-test
 	$(BUILD)/pci-host-test
 	$(BUILD)/audio-host-test
