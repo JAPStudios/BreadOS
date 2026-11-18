@@ -24,6 +24,10 @@ BreadOS is a freestanding 32-bit x86 operating system with its own kernel and na
 
 The `beep` command plays a tone through the PC speaker using PIT channel 2 (20–20,000 Hz; duration in 100 Hz timer ticks); this is basic mono tone output, not a sound-card, microphone, mixer, or audio-visualization stack. The `heapcheck` command validates the kernel heap block chain, metadata guards, and live allocation canaries. The allocator refuses to free allocations whose canaries fail validation. The `idle` command configures the desktop screensaver timeout in PIT ticks (100 ticks = one second, default five minutes; `off` disables it). The screensaver wakes on keyboard or mouse activity and is not a security lock screen. The `theme` command lists or applies the 23 palettes. `menu` searches the built-in command registry. `notify` creates a system notification; notification indexes are newest-first and snooze durations use PIT ticks (100 ticks = one second). `desktop` requires an RGB framebuffer of at least 320×240. Press `q` to return to the shell. Desktop shortcuts: `t` Appearance, `f` Files, `s` System, `e` Shell, `n` Notifications, `c` Clipboard, `d` toggle Do Not Disturb, `l` cycle layouts, `,`/`.` scroll the scrolling layout, `1`–`4` or `[`/`]` switch workspaces.
 
+## Native user applications
+
+The i386 user-mode SDK is in `user/include/breados/syscall.h`. It provides inline wrappers for console output, process exit, task IDs, nonblocking IPC, and task-local VFS file operations. `user/linker.ld` places application segments in the user address range and separates read/execute text from read/write data. `make user-apps` builds `build/user/hello.elf`; `make test` validates that generated ELF with the same loader checks used by the kernel. The build creates the ELF artifact but does not install it into BreadFS; `exec PATH` still requires the executable to exist in the mounted VFS.
+
 ## Build and test
 
 On Debian/Ubuntu:
