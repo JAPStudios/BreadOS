@@ -19,7 +19,7 @@ int main(int argc,char **argv) {
     struct elf32_image image;
     assert(elf32_inspect(bytes,(size_t)length,&image)==0);
     assert(image.entry>=ELF32_USER_START);
-    printf("Validated %s entry=0x%08X\\n",argv[1],image.entry);
+    printf("Validated %s entry=0x%08X\n",argv[1],image.entry);
     uint32_t load_count=0;
     int entry_executable=0;
     for(uint16_t i=0;i<image.program_header_count;i++) {
@@ -29,7 +29,7 @@ int main(int argc,char **argv) {
         assert(result==0);
         assert((segment.flags&4u)!=0);
         assert((segment.flags&3u)!=3u);
-        printf("  load vaddr=0x%08X mem=%u flags=0x%X\\n",segment.virtual_address,segment.memory_size,segment.flags);
+        printf("  load vaddr=0x%08X mem=%u flags=0x%X\n",segment.virtual_address,segment.memory_size,segment.flags);
         if((segment.flags&1u) && image.entry>=segment.virtual_address &&
            (uint64_t)image.entry<(uint64_t)segment.virtual_address+segment.memory_size)
             entry_executable=1;
