@@ -2,7 +2,7 @@
 set -euo pipefail
 mkdir -p build
 # Create a fresh persistent volume containing the compiled native user application.
-build/mk-breadfs-image build/breados-disk.img build/user/hello.elf build/user/guard.elf
+build/mk-breadfs-image build/breados-disk.img build/user/hello.elf build/user/guard.elf build/user/victim.elf build/user/attacker.elf
 rm -f build/qemu-monitor.sock
 timeout 20s qemu-system-i386 -display none \
   -monitor unix:build/qemu-monitor.sock,server,nowait -no-reboot -no-shutdown \
