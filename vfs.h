@@ -4,6 +4,7 @@
 #include <stdint.h>
 #define VFS_PATH_MAX 63u
 #define VFS_FILE_MAX 65535u
+/* Maximum simultaneously open VFS descriptors per task. */
 #define VFS_OPEN_MAX 4u
 #define VFS_O_READ 0x01u
 #define VFS_O_WRITE 0x02u
