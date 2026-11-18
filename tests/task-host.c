@@ -63,6 +63,8 @@ int main(void) {
     assert(task_switch_count() == 6);
     assert(kernel_switches == 4);
 
+    assert(task_create_user(user_frame,&user_space,0x5000u,0x3FFFFFFFu)==-1);
+    assert(task_create_user(user_frame,&user_space,0x5000u,0x40400000u)==-1);
     int id = task_create_user(user_frame, &user_space, 0x5000u, 0x40001FFFu);
     assert(id == 3);
     assert(task_schedule(shell_frame) == worker_a_frame);
@@ -87,6 +89,7 @@ int main(void) {
     assert(task_schedule(shell_frame) == worker_a_frame);
     assert(task_schedule(worker_a_frame) == worker_b_frame);
     assert(task_schedule(worker_b_frame) == user_frame);
+    assert(active_user_code_limit == 0x40002FFFu);
     assert(task_terminate_current(-11) == 0);
     assert(task_schedule(user_frame) == shell_frame);
     assert(task_exit_code((uint32_t)reused) == -11);
