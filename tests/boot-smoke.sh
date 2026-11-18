@@ -50,6 +50,14 @@ def send_text(text):
         monitor.sendall(("sendkey "+key+"\n").encode("ascii"))
         time.sleep(0.15)
 
+def fail(message):
+    try:
+        with open("build/qemu-serial.log",encoding="utf-8",errors="replace") as log:
+            print(log.read())
+    except OSError:
+        pass
+    raise SystemExit(message)
+
 def wait_for_text(needle,timeout=5.0):
     deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
@@ -81,10 +89,10 @@ send_text("exec victim\n")
 time.sleep(0.5)
 send_text("exec attacker\n")
 if not wait_for_text("PASS: another user process could not modify victim memory."):
-    raise SystemExit("Separate user address spaces did not preserve victim memory")
+    fail("Separate user address spaces did not preserve victim memory")
 send_text("help\n")
 if not wait_for_text("Commands: help, menu"):
-    raise SystemExit("Kernel shell did not remain responsive after the process-isolation test")
+    fail("Kernel shell did not remain responsive after the process-isolation test")
 monitor.close()
 PY
 set +e
