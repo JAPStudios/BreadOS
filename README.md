@@ -26,7 +26,7 @@ The `beep` command plays a tone through the PC speaker using PIT channel 2 (20â€
 
 ## Native user applications
 
-The i386 user-mode SDK is in `user/include/breados/syscall.h`. It provides inline wrappers for console output, process exit, task IDs, nonblocking IPC, and task-local VFS file operations. `user/linker.ld` places application segments in the user address range and separates read/execute text from read/write data. `make user-apps` builds `build/user/hello.elf`; `make test` validates that generated ELF with the same loader checks used by the kernel. The build creates the ELF artifact but does not install it into BreadFS; `exec PATH` still requires the executable to exist in the mounted VFS.
+The i386 user-mode SDK is in `user/include/breados/syscall.h`. It provides inline wrappers for console output, process exit, task IDs, nonblocking IPC, and task-local VFS file operations. `user/linker.ld` places application segments in the user address range and separates read/execute text from read/write data. `make user-apps` builds `build/user/hello.elf`; `make test` validates that generated ELF with the same loader checks used by the kernel. On a new run image, `make run` installs the sample as `/hello`; enter `exec hello` at the shell to launch it. Other applications must likewise be present in the mounted VFS before `exec PATH` can load them.
 
 ## Build and test
 
@@ -46,4 +46,4 @@ The current desktop is kernel-rendered; its windows are not yet independent user
 
 ## Storage safety
 
-`make run` uses the disposable `build/breados-disk.img` emulator image. The QEMU smoke test creates a zero-filled 16 MiB image. Do not point QEMU at a physical drive or an image containing data that must be preserved. BreadFS leaves unrecognized disk formats unchanged and falls back to the RAM filesystem.
+`make run` uses the disposable `build/breados-disk.img` emulator image. The first `make run` creates a 16 MiB BreadFS image containing the sample `/hello` application when no disk image exists; an existing image is preserved. The QEMU smoke test creates a fresh test image with the same sample application, boots it, executes the application, then verifies that the volume remounts on a second boot. Do not point QEMU at a physical drive or an image containing data that must be preserved. BreadFS leaves unrecognized disk formats unchanged and falls back to the RAM filesystem.
