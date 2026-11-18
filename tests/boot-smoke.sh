@@ -46,8 +46,8 @@ while time.monotonic()<deadline:
 
 def send_text(text):
     for character in text:
-        key="spc" if character==" " else "ret" if character=="\\n" else character
-        monitor.sendall(("sendkey "+key+"\\n").encode("ascii"))
+        key="spc" if character==" " else "ret" if character=="\n" else character
+        monitor.sendall(("sendkey "+key+"\n").encode("ascii"))
         time.sleep(0.15)
 
 def wait_for_text(needle,timeout=5.0):
@@ -62,17 +62,17 @@ def wait_for_text(needle,timeout=5.0):
         time.sleep(0.05)
     return False
 
-send_text("exec hello\\n")
+send_text("exec hello\n")
 if not wait_for_text("BreadOS native user-mode application."):
     raise SystemExit("Native hello application did not execute")
 
-send_text("exec guard\\n")
+send_text("exec guard\n")
 if not wait_for_text("BreadOS isolation test: attempting protected supervisor-memory write."):
     raise SystemExit("User-mode isolation test did not start")
 
 # The protected write must fault and terminate only the user task. The shell
 # must remain responsive, and the post-write failure marker must never appear.
-send_text("help\\n")
+send_text("help\n")
 if not wait_for_text("Commands: help, menu"):
     raise SystemExit("Kernel did not recover to the shell after the user-mode protection fault")
 monitor.close()
