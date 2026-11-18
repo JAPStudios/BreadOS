@@ -87,16 +87,32 @@ int main(void) {
     assert(handles[1]>=0);
     for(unsigned i=0;i<VFS_OPEN_MAX;i++) assert(vfs_close(handles[i])==0);
 
-    /* Handles are private to their creating task and are discarded on exit. */
+    /* Each task has an independent descriptor table, including identical fd numbers. */
     active_task_id=3;
-    fd=vfs_open("/empty.txt",VFS_O_READ);
-    assert(fd>=0);
+    int task3_fd=vfs_open("/empty.txt",VFS_O_READ);
+    assert(task3_fd==0);
     active_task_id=4;
-    assert(vfs_read(fd,buffer,1)<0);
-    assert(vfs_close(fd)<0);
-    vfs_close_task(3);
+    int task4_fd=vfs_open("/empty.txt",VFS_O_READ);
+    assert(task4_fd==0);
+    assert(vfs_read(task4_fd,buffer,1)==0);
     active_task_id=3;
-    assert(vfs_read(fd,buffer,1)<0);
+    assert(vfs_read(task3_fd,buffer,1)==0);
+    assert(vfs_close(task3_fd)==0);
+    active_task_id=4;
+    assert(vfs_close(task4_fd)==0);
+
+    /* A task's descriptor capacity is independent of other tasks. */
+    active_task_id=3;
+    for(unsigned i=0;i<VFS_OPEN_MAX;i++)
+        handles[i]=vfs_open("/empty.txt",VFS_O_READ);
+    for(unsigned i=0;i<VFS_OPEN_MAX;i++) assert(handles[i]>=0);
+    active_task_id=4;
+    for(unsigned i=0;i<VFS_OPEN_MAX;i++)
+        assert(vfs_open("/empty.txt",VFS_O_READ)>=0);
+    active_task_id=3;
+    vfs_close_task(3);
+    active_task_id=4;
+    vfs_close_task(4);
     active_task_id=0;
 
     /* Process exit closes owned handles and commits completed file writes. */
