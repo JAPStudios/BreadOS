@@ -22,6 +22,7 @@ void _start(void) {
     for(;;) {
         if(bread_receive(message,sizeof(message),&sender)>=0) break;
     }
+    (void)bread_write("victim received IPC.\\n",21u);
     if(sender!=4u) {
         (void)bread_write(wrong_sender,(uint32_t)(sizeof(wrong_sender)-1u));
         bread_exit(1);
