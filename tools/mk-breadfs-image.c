@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define IMAGE_SECTOR_SIZE 512u
 #define IMAGE_SECTOR_COUNT 32768u
@@ -44,7 +45,9 @@ static int load_file(const char *path,uint8_t **bytes,size_t *size) {
     }
     uint8_t *data=(uint8_t *)malloc((size_t)length);
     if(!data) { fclose(file); return -1; }
-    if(fread(data,1,(size_t)length,file)!=(size_t)length || fclose(file)!=0) {
+    size_t read_count=fread(data,1,(size_t)length,file);
+    int close_status=fclose(file);
+    if(read_count!=(size_t)length || close_status!=0) {
         free(data);
         return -1;
     }
@@ -88,12 +91,24 @@ int main(int argc,char **argv) {
         return 1;
     }
     int written=pfs_write_binary("hello",application,application_size);
-    free(application);
-    if(written!=(int)application_size) {
+    if(written!=(int)application_size || pfs_init()!=1 || !pfs_ready()) {
         fprintf(stderr,"Could not install hello application into BreadFS.\n");
         fclose(image_file);
+        free(application);
         return 1;
     }
+    uint8_t *verification=(uint8_t *)malloc(application_size);
+    if(!verification ||
+       pfs_read_binary("hello",verification,application_size)!=(int)application_size ||
+       memcmp(application,verification,application_size)!=0) {
+        fprintf(stderr,"BreadFS application read-back verification failed.\n");
+        free(verification);
+        fclose(image_file);
+        free(application);
+        return 1;
+    }
+    free(verification);
+    free(application);
     if(fclose(image_file)!=0) {
         fprintf(stderr,"Could not finalize disk image.\n");
         return 1;
