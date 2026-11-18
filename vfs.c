@@ -33,7 +33,7 @@ struct vfs_handle {
 };
 
 static struct vfs_mount_entry mounts[VFS_MOUNT_MAX];
-static struct vfs_handle handles[VFS_OPEN_MAX];
+static struct vfs_handle handles[TASK_MAX][VFS_OPEN_MAX];
 
 static size_t str_len(const char *s) {
     size_t n=0;
@@ -135,7 +135,8 @@ int vfs_mount(const char *mount_path,enum vfs_backend backend) {
 
 void vfs_init(void) {
     for (uint32_t i=0;i<VFS_MOUNT_MAX;i++) mounts[i].used=0;
-    for (uint32_t i=0;i<VFS_OPEN_MAX;i++) handles[i].used=0;
+    for (uint32_t task=0;task<TASK_MAX;task++)
+        for (uint32_t i=0;i<VFS_OPEN_MAX;i++) handles[task][i].used=0;
     (void)vfs_mount("/",pfs_ready()?VFS_BACKEND_BREADFS:VFS_BACKEND_RAM);
     (void)vfs_mount("/dev",VFS_BACKEND_DEV);
     (void)vfs_mount("/proc",VFS_BACKEND_PROC);
@@ -255,9 +256,10 @@ static int proc_name(const char *path) {
            str_eq(path,"meminfo") || str_eq(path,"tasks");
 }
 static struct vfs_handle *handle_at(int handle) {
-    if (handle<0 || (uint32_t)handle>=VFS_OPEN_MAX || !handles[handle].used ||
-        handles[handle].owner!=task_current_id()) return 0;
-    return &handles[handle];
+    uint32_t owner=task_current_id();
+    if (owner>=TASK_MAX || handle<0 || (uint32_t)handle>=VFS_OPEN_MAX ||
+        !handles[owner][handle].used) return 0;
+    return &handles[owner][handle];
 }
 
 int vfs_open(const char *path,uint32_t flags) {
@@ -269,11 +271,14 @@ int vfs_open(const char *path,uint32_t flags) {
     enum vfs_backend backend; const char *relative;
     char normalized[VFS_PATH_MAX+1u];
     if (resolve_path(path,&backend,&relative,normalized)<0 || !*relative) return -1;
+    uint32_t owner=task_current_id();
+    if(owner>=TASK_MAX) return -1;
     int slot=-1;
-    for(uint32_t i=0;i<VFS_OPEN_MAX;i++) if(!handles[i].used){slot=(int)i;break;}
+    for(uint32_t i=0;i<VFS_OPEN_MAX;i++)
+        if(!handles[owner][i].used){slot=(int)i;break;}
     if(slot<0) return -1;
-    struct vfs_handle *h=&handles[slot];
-    h->backend=backend;h->flags=flags;h->owner=task_current_id();
+    struct vfs_handle *h=&handles[owner][slot];
+    h->backend=backend;h->flags=flags;h->owner=owner;
     h->position=0;h->size=0;h->dirty=0;h->device=0;
     bytes_copy(h->path,relative,str_len(relative)+1u);
     if(backend==VFS_BACKEND_DEV) {
@@ -346,9 +351,10 @@ int vfs_close(int handle) {
 }
 
 void vfs_close_task(uint32_t task_id) {
+    if(task_id>=TASK_MAX) return;
     for(uint32_t i=0;i<VFS_OPEN_MAX;i++) {
-        if(handles[i].used && handles[i].owner==task_id)
-            (void)finish_handle(&handles[i]);
+        if(handles[task_id][i].used)
+            (void)finish_handle(&handles[task_id][i]);
     }
 }
 
