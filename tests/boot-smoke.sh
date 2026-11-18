@@ -2,9 +2,9 @@
 set -euo pipefail
 mkdir -p build
 # Create a fresh persistent volume containing the compiled native user application.
-build/mk-breadfs-image build/breados-disk.img build/user/hello.elf build/user/guard.elf
+build/mk-breadfs-image build/breados-disk.img build/user/hello.elf build/user/guard.elf build/user/victim.elf build/user/attacker.elf
 rm -f build/qemu-monitor.sock
-timeout 12s qemu-system-i386 -display none \
+timeout 20s qemu-system-i386 -display none \
   -monitor unix:build/qemu-monitor.sock,server,nowait -no-reboot -no-shutdown \
   -serial stdio -drive file=build/breados-disk.img,format=raw,if=ide,index=0 \
   -cdrom build/breados.iso > build/qemu-serial.log 2>&1 &
@@ -50,6 +50,14 @@ def send_text(text):
         monitor.sendall(("sendkey "+key+"\n").encode("ascii"))
         time.sleep(0.15)
 
+def fail(message):
+    try:
+        with open("build/qemu-serial.log",encoding="utf-8",errors="replace") as log:
+            print(log.read())
+    except OSError:
+        pass
+    raise SystemExit(message)
+
 def wait_for_text(needle,timeout=5.0):
     deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
@@ -75,6 +83,16 @@ if not wait_for_text("BreadOS isolation test: attempting protected supervisor-me
 send_text("help\n")
 if not wait_for_text("Commands: help, menu"):
     raise SystemExit("Kernel did not recover to the shell after the user-mode protection fault")
+
+# Two user processes map the same virtual data address to different frames.
+send_text("exec victim\n")
+time.sleep(0.5)
+send_text("exec attacker\n")
+if not wait_for_text("PASS: another user process could not modify victim memory."):
+    fail("Separate user address spaces did not preserve victim memory")
+send_text("help\n")
+if not wait_for_text("Commands: help, menu"):
+    fail("Kernel shell did not remain responsive after the process-isolation test")
 monitor.close()
 PY
 set +e
@@ -95,6 +113,11 @@ grep -F "bread>" build/qemu-serial.log
 grep -F "BreadOS native user-mode application." build/qemu-serial.log
 grep -F "BreadOS isolation test: attempting protected supervisor-memory write." build/qemu-serial.log
 grep -F "Commands: help, menu" build/qemu-serial.log
+grep -F "PASS: another user process could not modify victim memory." build/qemu-serial.log
+if grep -Fq "FAIL: another user process modified victim memory." build/qemu-serial.log || grep -Fq "FAIL: attacker could not send IPC to victim." build/qemu-serial.log; then
+  echo "User processes were not isolated correctly." >&2
+  exit 1
+fi
 if grep -Fq "FAIL: user mode modified supervisor memory." build/qemu-serial.log; then
   echo "User-mode process wrote to supervisor memory." >&2
   exit 1

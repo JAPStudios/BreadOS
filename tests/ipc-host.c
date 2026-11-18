@@ -35,19 +35,24 @@ int main(void) {
     ipc_reset_task(4);
     assert(ipc_receive(4,received,sizeof(received),&sender)==-1);
 
-    /* Removing one sender must preserve messages from every other sender. */
+    /* Sender exit preserves queued payloads and clears the stale sender ID. */
     assert(ipc_send(3,4,sent,4)==0);
     assert(ipc_send(5,4,sent,6)==0);
     assert(ipc_send(3,4,sent,8)==0);
     runnable[3]=0;
     ipc_remove_sender(3);
+    assert(ipc_receive(4,received,sizeof(received),&sender)==4);
+    assert(sender==0);
+    for(uint32_t i=0;i<4;i++) assert(received[i]==sent[i]);
     assert(ipc_receive(4,received,sizeof(received),&sender)==6);
     assert(sender==5);
     for(uint32_t i=0;i<6;i++) assert(received[i]==sent[i]);
+    assert(ipc_receive(4,received,sizeof(received),&sender)==8);
+    assert(sender==0);
     assert(ipc_receive(4,received,sizeof(received),&sender)==-1);
 
 
-    /* Sender cleanup must preserve FIFO order when the ring has wrapped. */
+    /* Sender cleanup preserves FIFO order when the ring has wrapped. */
     runnable[3]=1;
     ipc_reset_task(4);
     sent[0]=10;
@@ -66,7 +71,9 @@ int main(void) {
     assert(ipc_send(5,4,sent,1)==0);
     runnable[3]=0;
     ipc_remove_sender(3);
+    assert(ipc_receive(4,received,1,&sender)==1 && sender==0 && received[0]==30);
     assert(ipc_receive(4,received,1,&sender)==1 && sender==5 && received[0]==40);
+    assert(ipc_receive(4,received,1,&sender)==1 && sender==0 && received[0]==50);
     assert(ipc_receive(4,received,1,&sender)==1 && sender==5 && received[0]==60);
     assert(ipc_receive(4,received,1,&sender)==-1);
 

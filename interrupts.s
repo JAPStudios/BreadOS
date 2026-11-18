@@ -69,6 +69,13 @@ syscall80:
     jmp isr_common
 isr_common:
     pusha
+    /* User-to-kernel interrupts retain user DS/ES/FS/GS; use flat kernel data
+       selectors while the C interrupt handler accesses kernel state. */
+    movw $0x10, %ax
+    movw %ax, %ds
+    movw %ax, %es
+    movw %ax, %fs
+    movw %ax, %gs
     movl %esp, %eax
     pushl %eax
     pushl 40(%esp)
@@ -78,5 +85,19 @@ isr_common:
     movl %eax, %esp
     popa
     addl $8, %esp
+    /* Select flat data segments for the task whose iret frame was chosen. */
+    pushl %eax
+    testb $3, 8(%esp)
+    jz 1f
+    movw $0x23, %ax
+    jmp 2f
+1:
+    movw $0x10, %ax
+2:
+    movw %ax, %ds
+    movw %ax, %es
+    movw %ax, %fs
+    movw %ax, %gs
+    popl %eax
     iret
 .section .note.GNU-stack,"",@progbits
