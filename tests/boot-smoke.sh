@@ -2,7 +2,7 @@
 set -euo pipefail
 mkdir -p build
 # Create a fresh persistent volume containing the compiled native user application.
-build/mk-breadfs-image build/breados-disk.img build/user/hello.elf
+build/mk-breadfs-image build/breados-disk.img build/user/hello.elf build/user/guard.elf
 rm -f build/qemu-monitor.sock
 timeout 12s qemu-system-i386 -display none \
   -monitor unix:build/qemu-monitor.sock,server,nowait -no-reboot -no-shutdown \
@@ -33,7 +33,7 @@ while time.monotonic()<deadline:
 if monitor is None:
     raise SystemExit("QEMU monitor did not become available")
 
-# Wait until the shell prompt is visible before typing the application command.
+# Wait until the shell prompt is visible before typing application commands.
 deadline=time.monotonic()+6.0
 while time.monotonic()<deadline:
     try:
@@ -44,9 +44,37 @@ while time.monotonic()<deadline:
         pass
     time.sleep(0.05)
 
-for key in ("e","x","e","c","spc","h","e","l","l","o","ret"):
-    monitor.sendall(("sendkey "+key+"\n").encode("ascii"))
-    time.sleep(0.15)
+def send_text(text):
+    for character in text:
+        key="spc" if character==" " else "ret" if character=="\\n" else character
+        monitor.sendall(("sendkey "+key+"\\n").encode("ascii"))
+        time.sleep(0.15)
+
+def wait_for_text(needle,timeout=5.0):
+    deadline=time.monotonic()+timeout
+    while time.monotonic()<deadline:
+        try:
+            with open("build/qemu-serial.log",encoding="utf-8",errors="replace") as log:
+                if needle in log.read():
+                    return True
+        except OSError:
+            pass
+        time.sleep(0.05)
+    return False
+
+send_text("exec hello\\n")
+if not wait_for_text("BreadOS native user-mode application."):
+    raise SystemExit("Native hello application did not execute")
+
+send_text("exec guard\\n")
+if not wait_for_text("BreadOS isolation test: attempting protected supervisor-memory write."):
+    raise SystemExit("User-mode isolation test did not start")
+
+# The protected write must fault and terminate only the user task. The shell
+# must remain responsive, and the post-write failure marker must never appear.
+send_text("help\\n")
+if not wait_for_text("Commands: help, menu"):
+    raise SystemExit("Kernel did not recover to the shell after the user-mode protection fault")
 monitor.close()
 PY
 set +e
@@ -65,6 +93,12 @@ grep -F "Paging enabled: first 256 MiB identity-mapped." build/qemu-serial.log
 grep -F "Persistent BreadFS mounted." build/qemu-serial.log
 grep -F "bread>" build/qemu-serial.log
 grep -F "BreadOS native user-mode application." build/qemu-serial.log
+grep -F "BreadOS isolation test: attempting protected supervisor-memory write." build/qemu-serial.log
+grep -F "Commands: help, menu" build/qemu-serial.log
+if grep -Fq "FAIL: user mode modified supervisor memory." build/qemu-serial.log; then
+  echo "User-mode process wrote to supervisor memory." >&2
+  exit 1
+fi
 grep -F "Scheduler smoke test passed: round-robin task switching verified." build/qemu-serial.log
 grep -F "URing-3 process and syscall smoke test passed." build/qemu-serial.log
 # Boot a second time without replacing the image; the volume must mount, not format.
