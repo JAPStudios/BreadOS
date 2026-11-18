@@ -21,10 +21,12 @@ void _start(void) {
     volatile uint32_t *other_process_data=
         (volatile uint32_t *)(uintptr_t)0x40002000u;
     *other_process_data=0xDEADBEEFu;
+    (void)bread_write("attacker write succeeded.\\n",27u);
 
     if(bread_send(3u,message,1u)<0) {
         (void)bread_write(failed,(uint32_t)(sizeof(failed)-1u));
         bread_exit(1);
     }
+    (void)bread_write("attacker IPC sent.\\n",21u);
     bread_exit(0);
 }
