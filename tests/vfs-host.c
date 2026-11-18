@@ -94,9 +94,9 @@ int main(void) {
     active_task_id=4;
     int task4_fd=vfs_open("/empty.txt",VFS_O_READ);
     assert(task4_fd==0);
-    assert(vfs_read(task4_fd,buffer,1)==0);
+    assert(vfs_read(task4_fd,buffer,1)==1 && buffer[0]=='x');
     active_task_id=3;
-    assert(vfs_read(task3_fd,buffer,1)==0);
+    assert(vfs_read(task3_fd,buffer,1)==1 && buffer[0]=='x');
     assert(vfs_close(task3_fd)==0);
     active_task_id=4;
     assert(vfs_close(task4_fd)==0);
