@@ -115,7 +115,9 @@ static uint32_t *process_initial_frame(uint32_t kernel_stack_top,
 
 static int process_spawn_elf_inner(const void *bytes,size_t size) {
     struct elf32_image image;
-    if (elf32_inspect(bytes,size,&image)<0) return -1;
+    uint32_t user_code_limit;
+    if (elf32_inspect(bytes,size,&image)<0 ||
+        elf32_user_code_limit(&image,&user_code_limit)<0) return -1;
 
     struct process_record *p=process_reserve();
     if (!p) return -1;
@@ -166,7 +168,8 @@ static int process_spawn_elf_inner(const void *bytes,size_t size) {
     uint32_t stack_top=p->kernel_stack_frame+PAGE_SIZE;
     uint32_t *initial_frame=process_initial_frame(
         stack_top,image.entry,ELF32_USER_STACK_PAGE+PAGE_SIZE-16u);
-    int task_id=task_create_user(initial_frame,&p->address_space,stack_top);
+    int task_id=task_create_user(initial_frame,&p->address_space,stack_top,
+                                 user_code_limit);
     if (task_id<0) {
         process_release_resources(p);
         return -1;
