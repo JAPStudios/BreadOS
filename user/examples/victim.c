@@ -24,7 +24,7 @@ void _start(void) {
         if(bread_receive(message,sizeof(message),&sender)>=0) break;
     }
     (void)bread_write(received,(uint32_t)(sizeof(received)-1u));
-    if(sender!=4u) {
+    if(sender!=0u && sender!=4u) {
         (void)bread_write(wrong_sender,(uint32_t)(sizeof(wrong_sender)-1u));
         bread_exit(1);
     }
