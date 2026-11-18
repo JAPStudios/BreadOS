@@ -77,24 +77,14 @@ int ipc_receive(uint32_t receiver,void *data,uint32_t capacity,
 
 void ipc_remove_sender(uint32_t task_id) {
     if (task_id<TASK_KERNEL_COUNT || task_id>=TASK_MAX) return;
-    for (uint32_t target=TASK_KERNEL_COUNT;target<TASK_MAX;target++) {
+    /* A successful send owns a queue slot until the receiver consumes it.
+       Preserve queued payloads when the sender exits, but clear its stale ID. */
+    for(uint32_t target=TASK_KERNEL_COUNT;target<TASK_MAX;target++) {
         struct ipc_mailbox *box=&mailboxes[target];
-        struct ipc_message kept[IPC_QUEUE_CAPACITY];
-        uint32_t kept_count=0;
-        for (uint32_t i=0;i<box->count;i++) {
+        for(uint32_t i=0;i<box->count;i++) {
             uint32_t index=(box->head+i)%IPC_QUEUE_CAPACITY;
-            struct ipc_message *message=&box->messages[index];
-            if (message->sender==task_id) continue;
-            kept[kept_count++]=*message;
+            if(box->messages[index].sender==task_id)
+                box->messages[index].sender=0;
         }
-        for (uint32_t i=0;i<IPC_QUEUE_CAPACITY;i++)
-            clear_message(&box->messages[i]);
-        for (uint32_t i=0;i<kept_count;i++)
-            box->messages[i]=kept[i];
-        /* The compaction buffer temporarily holds live IPC payloads. */
-        volatile uint8_t *temporary=(volatile uint8_t *)kept;
-        for (uint32_t i=0;i<sizeof(kept);i++) temporary[i]=0;
-        box->head=0;
-        box->count=(uint8_t)kept_count;
     }
 }
