@@ -126,7 +126,9 @@ int elf32_inspect(const void *data, size_t size, struct elf32_image *image) {
             lowest_writable_start=seg.virtual_address;
         ++load_count;
     }
-    if (!load_count || !entry_executable || lowest_writable_start<=highest_executable_end)
+    uint64_t executable_page_end=(highest_executable_end+ELF_PAGE_SIZE-1u)&
+                                ~((uint64_t)ELF_PAGE_SIZE-1u);
+    if (!load_count || !entry_executable || lowest_writable_start<executable_page_end)
         return -1;
     return 0;
 }
