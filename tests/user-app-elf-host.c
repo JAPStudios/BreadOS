@@ -39,7 +39,7 @@ int main(int argc,char **argv) {
         ++load_count;
     }
     assert(load_count>0 && entry_executable);
-    printf("  user CS limit=0x%08X\\n",code_limit);
+    printf("  user CS limit=0x%08X\n",code_limit);
     free(bytes);
     return 0;
 }
