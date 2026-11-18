@@ -102,7 +102,11 @@ $(BUILD)/user/attacker.elf: user/examples/attacker.c user/include/breados/syscal
 	mkdir -p $(BUILD)/user
 	$(CC) $(USER_CFLAGS) -Iuser/include -c user/examples/attacker.c -o $(BUILD)/user/attacker.o
 	$(LD) -m elf_i386 -z max-page-size=0x1000 -T user/linker.ld -nostdlib -o $@ $(BUILD)/user/attacker.o
-user-apps: $(BUILD)/user/hello.elf $(BUILD)/user/guard.elf $(BUILD)/user/victim.elf $(BUILD)/user/attacker.elf
+$(BUILD)/user/wxguard.elf: user/examples/wxguard.c user/include/breados/syscall.h user/linker.ld | $(BUILD)
+	mkdir -p $(BUILD)/user
+	$(CC) $(USER_CFLAGS) -Iuser/include -c user/examples/wxguard.c -o $(BUILD)/user/wxguard.o
+	$(LD) -m elf_i386 -z max-page-size=0x1000 -T user/linker.ld -nostdlib -o $@ $(BUILD)/user/wxguard.o
+user-apps: $(BUILD)/user/hello.elf $(BUILD)/user/guard.elf $(BUILD)/user/victim.elf $(BUILD)/user/attacker.elf $(BUILD)/user/wxguard.elf
 
 $(BUILD)/user-app-elf-host-test: tests/user-app-elf-host.c elf_loader.c elf_loader.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/user-app-elf-host.c elf_loader.c -o $@
@@ -180,6 +184,7 @@ test: iso user-apps $(BUILD)/mk-breadfs-image $(BUILD)/user-app-elf-host-test $(
 	$(BUILD)/user-app-elf-host-test $(BUILD)/user/guard.elf
 	$(BUILD)/user-app-elf-host-test $(BUILD)/user/victim.elf
 	$(BUILD)/user-app-elf-host-test $(BUILD)/user/attacker.elf
+	$(BUILD)/user-app-elf-host-test $(BUILD)/user/wxguard.elf
 	$(BUILD)/elf-loader-host-test
 	$(BUILD)/pci-host-test
 	$(BUILD)/audio-host-test
