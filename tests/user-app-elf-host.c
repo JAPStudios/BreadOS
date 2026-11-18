@@ -19,6 +19,8 @@ int main(int argc,char **argv) {
     struct elf32_image image;
     assert(elf32_inspect(bytes,(size_t)length,&image)==0);
     assert(image.entry>=ELF32_USER_START);
+    uint32_t code_limit=0;
+    assert(elf32_user_code_limit(&image,&code_limit)==0);
     printf("Validated %s entry=0x%08X\n",argv[1],image.entry);
     uint32_t load_count=0;
     int entry_executable=0;
@@ -30,12 +32,14 @@ int main(int argc,char **argv) {
         assert((segment.flags&4u)!=0);
         assert((segment.flags&3u)!=3u);
         printf("  load vaddr=0x%08X mem=%u flags=0x%X\n",segment.virtual_address,segment.memory_size,segment.flags);
+        if(segment.flags&2u) assert(segment.virtual_address>code_limit);
         if((segment.flags&1u) && image.entry>=segment.virtual_address &&
            (uint64_t)image.entry<(uint64_t)segment.virtual_address+segment.memory_size)
             entry_executable=1;
         ++load_count;
     }
     assert(load_count>0 && entry_executable);
+    printf("  user CS limit=0x%08X\\n",code_limit);
     free(bytes);
     return 0;
 }
