@@ -118,6 +118,10 @@ static int resolve_path(const char *input,enum vfs_backend *backend,
 
 static int backend_exists(enum vfs_backend backend,const char *path,int *is_directory);
 
+static int path_is_under(const char *path,const char *prefix) {
+    size_t n=str_len(prefix);
+    return str_starts(path,prefix) && (path[n]==0 || path[n]=='/');
+}
 static int mount_index_for_path(const char *normalized) {
     int best=-1;
     size_t best_length=0;
@@ -161,6 +165,13 @@ int vfs_mount(const char *mount_path,enum vfs_backend backend) {
         if(resolve_path(mount_path,&parent_backend,&parent_relative,parent_normalized)<0 ||
            !*parent_relative || !backend_exists(parent_backend,parent_relative,&is_directory) ||
            !is_directory) return -1;
+        int parent_index=mount_index_for_path(parent_normalized);
+        if(parent_index<0) return -1;
+        for(uint32_t task=0;task<TASK_MAX;task++)
+            for(uint32_t h=0;h<VFS_OPEN_MAX;h++)
+                if(handles[task][h].used &&
+                   handles[task][h].mount_index==(uint8_t)parent_index &&
+                   path_is_under(handles[task][h].path,parent_relative)) return -1;
     }
 
     size_t mount_length=str_len(normalized);
