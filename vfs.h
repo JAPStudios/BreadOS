@@ -17,6 +17,7 @@ struct vfs_stat { enum vfs_node_type type; uint32_t size; };
 struct vfs_dirent { char name[16]; enum vfs_node_type type; uint32_t size; };
 void vfs_init(void);
 int vfs_mount(const char *mount_path,enum vfs_backend backend);
+int vfs_unmount(const char *mount_path);
 int vfs_open(const char *path,uint32_t flags);
 int vfs_close(int handle);
 /* Discard every open handle owned by a task during deferred process cleanup. */
