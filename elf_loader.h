@@ -33,4 +33,8 @@ int elf32_inspect(const void *bytes, size_t size, struct elf32_image *image);
 int elf32_load_segment_at(const struct elf32_image *image, uint16_t index,
                           struct elf32_load_segment *segment);
 
+/* Inclusive i386 user CS limit derived from executable PT_LOAD segments. */
+int elf32_user_code_limit(const struct elf32_image *image,
+                          uint32_t *inclusive_limit);
+
 #endif

@@ -50,7 +50,9 @@ static struct process_record *process_reserve(void) {
             p->task_id=0;
             p->kernel_stack_frame=0;
             p->address_space.directory_physical=0;
-            p->address_space.user_table_physical=0;
+            p->address_space.user_directory_physical=0;
+            p->address_space.user_table_physical[0]=0;
+            p->address_space.user_table_physical[1]=0;
             p->page_count=0;
             __asm__ volatile ("" : : : "memory");
             p->used=1;
@@ -76,13 +78,13 @@ static void process_release_resources(struct process_record *p) {
 }
 
 static int process_add_page(struct process_record *p,uint32_t virtual_address,
-                            int writable,uint32_t *physical_out) {
+                            int writable,int executable,uint32_t *physical_out) {
     if (!p || p->page_count>=PROCESS_MAX_USER_PAGES || !physical_out) return -1;
     uint32_t physical=memory_alloc_frame();
     if (!physical) return -1;
     zero_page(physical);
     if (paging_address_space_map_user_page(&p->address_space,virtual_address,
-                                           physical,writable)<0) {
+                                           physical,writable,executable)<0) {
         memory_free_frame(physical);
         return -1;
     }
@@ -115,7 +117,7 @@ static uint32_t *process_initial_frame(uint32_t kernel_stack_top,
 
 static int process_spawn_elf_inner(const void *bytes,size_t size) {
     struct elf32_image image;
-    if (elf32_inspect(bytes,size,&image)<0) return -1;
+    if (!paging_nx_supported() || elf32_inspect(bytes,size,&image)<0) return -1;
 
     struct process_record *p=process_reserve();
     if (!p) return -1;
@@ -136,7 +138,7 @@ static int process_spawn_elf_inner(const void *bytes,size_t size) {
             uint32_t physical;
             uint32_t virtual_address=segment.virtual_address+offset;
             if (process_add_page(p,virtual_address,
-                                 (segment.flags&2u)!=0,&physical)<0) {
+                                 (segment.flags&2u)!=0,(segment.flags&1u)!=0,&physical)<0) {
                 process_release_resources(p);
                 return -1;
             }
@@ -151,7 +153,7 @@ static int process_spawn_elf_inner(const void *bytes,size_t size) {
     }
 
     uint32_t stack_frame;
-    if (process_add_page(p,ELF32_USER_STACK_PAGE,1,&stack_frame)<0) {
+    if (process_add_page(p,ELF32_USER_STACK_PAGE,1,0,&stack_frame)<0) {
         process_release_resources(p);
         return -1;
     }

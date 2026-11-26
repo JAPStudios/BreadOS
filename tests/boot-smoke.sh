@@ -2,9 +2,9 @@
 set -euo pipefail
 mkdir -p build
 # Create a fresh persistent volume containing the compiled native user application.
-build/mk-breadfs-image build/breados-disk.img build/user/hello.elf build/user/guard.elf build/user/victim.elf build/user/attacker.elf
+build/mk-breadfs-image build/breados-disk.img build/user/hello.elf build/user/guard.elf build/user/victim.elf build/user/attacker.elf build/user/wxguard.elf
 rm -f build/qemu-monitor.sock
-timeout 20s qemu-system-i386 -display none \
+timeout 60s qemu-system-i386 -cpu qemu32,+pae,+nx -display none \
   -monitor unix:build/qemu-monitor.sock,server,nowait -no-reboot -no-shutdown \
   -serial stdio -drive file=build/breados-disk.img,format=raw,if=ide,index=0 \
   -cdrom build/breados.iso > build/qemu-serial.log 2>&1 &
@@ -16,6 +16,7 @@ import socket
 import time
 
 monitor_path="build/qemu-monitor.sock"
+log_path="build/qemu-serial.log"
 deadline=time.monotonic()+6.0
 monitor=None
 while time.monotonic()<deadline:
@@ -33,16 +34,11 @@ while time.monotonic()<deadline:
 if monitor is None:
     raise SystemExit("QEMU monitor did not become available")
 
-# Wait until the shell prompt is visible before typing application commands.
-deadline=time.monotonic()+6.0
-while time.monotonic()<deadline:
+def log_offset():
     try:
-        with open("build/qemu-serial.log",encoding="utf-8",errors="replace") as log:
-            if "bread>" in log.read():
-                break
+        return os.path.getsize(log_path)
     except OSError:
-        pass
-    time.sleep(0.05)
+        return 0
 
 def send_text(text):
     for character in text:
@@ -52,47 +48,93 @@ def send_text(text):
 
 def fail(message):
     try:
-        with open("build/qemu-serial.log",encoding="utf-8",errors="replace") as log:
+        with open(log_path,encoding="utf-8",errors="replace") as log:
             print(log.read())
     except OSError:
         pass
     raise SystemExit(message)
 
-def wait_for_text(needle,timeout=5.0):
+def wait_for_text(needle,timeout=5.0,offset=0):
     deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
         try:
-            with open("build/qemu-serial.log",encoding="utf-8",errors="replace") as log:
-                if needle in log.read():
+            with open(log_path,"rb") as log:
+                log.seek(offset)
+                if needle.encode("utf-8") in log.read():
                     return True
         except OSError:
             pass
         time.sleep(0.05)
     return False
 
+if not wait_for_text("bread>",timeout=6.0):
+    fail("Kernel shell prompt did not appear")
+
+offset=log_offset()
 send_text("exec hello\n")
-if not wait_for_text("BreadOS native user-mode application."):
-    raise SystemExit("Native hello application did not execute")
+if not wait_for_text("BreadOS native user-mode application.",offset=offset):
+    fail("Native hello application did not execute")
 
+offset=log_offset()
 send_text("exec guard\n")
-if not wait_for_text("BreadOS isolation test: attempting protected supervisor-memory write."):
-    raise SystemExit("User-mode isolation test did not start")
+if not wait_for_text("BreadOS isolation test: attempting protected supervisor-memory write.",offset=offset):
+    fail("User-mode isolation test did not start")
 
-# The protected write must fault and terminate only the user task. The shell
-# must remain responsive, and the post-write failure marker must never appear.
+offset=log_offset()
 send_text("help\n")
-if not wait_for_text("Commands: help, menu"):
-    raise SystemExit("Kernel did not recover to the shell after the user-mode protection fault")
+if not wait_for_text("Commands: help, menu",offset=offset):
+    fail("Kernel did not recover to the shell after the user-mode protection fault")
 
 # Two user processes map the same virtual data address to different frames.
+offset=log_offset()
 send_text("exec victim\n")
-time.sleep(0.5)
+if not wait_for_text("victim task id: 3",offset=offset):
+    fail("Victim process did not receive task slot 3")
+offset=log_offset()
 send_text("exec attacker\n")
-if not wait_for_text("PASS: another user process could not modify victim memory."):
+if not wait_for_text("attacker task id: 4",offset=offset):
+    fail("Attacker process did not receive task slot 4")
+if not wait_for_text("PASS: another user process could not modify victim memory.",offset=offset):
     fail("Separate user address spaces did not preserve victim memory")
+
+offset=log_offset()
 send_text("help\n")
-if not wait_for_text("Commands: help, menu"):
+if not wait_for_text("Commands: help, menu",offset=offset):
     fail("Kernel shell did not remain responsive after the process-isolation test")
+time.sleep(0.2)
+
+# Keep task 3 alive while the W^X process exercises its separate user address space.
+offset=log_offset()
+send_text("exec victim\n")
+if not wait_for_text("victim task id: 3",offset=offset):
+    fail("Second victim process did not receive task slot 3")
+offset=log_offset()
+send_text("exec wxguard\n")
+if not wait_for_text("W^X task id: 4",offset=offset):
+    fail("W^X test did not receive task slot 4")
+if not wait_for_text("PASS: writable data write succeeded.",offset=offset):
+    fail("W^X test could not write to its writable data page")
+if not wait_for_text("W^X test: attempting to execute writable data.",offset=offset):
+    fail("W^X test application did not reach the writable-execution probe")
+
+offset=log_offset()
+send_text("help\n")
+if not wait_for_text("Commands: help, menu",offset=offset):
+    fail("Kernel shell did not recover after the writable-execution fault")
+time.sleep(0.2)
+
+# Reuse slot 4 after the W^X process exits; the waiting victim must still be isolated.
+offset=log_offset()
+send_text("exec attacker\n")
+if not wait_for_text("attacker task id: 4",offset=offset):
+    fail("Task slot 4 was not reusable after the W^X process exited")
+if not wait_for_text("PASS: another user process could not modify victim memory.",offset=offset):
+    fail("Victim memory isolation failed after task-slot reuse")
+
+offset=log_offset()
+send_text("help\n")
+if not wait_for_text("Commands: help, menu",offset=offset):
+    fail("Kernel shell did not remain responsive after task-slot reuse")
 monitor.close()
 PY
 set +e
@@ -107,14 +149,19 @@ if [ "$status" -ne 124 ]; then
 fi
 grep -F "BreadOS kernel starting..." build/qemu-serial.log
 grep -F "Boot OK. VGA console and PS/2 keyboard shell ready." build/qemu-serial.log
-grep -F "Paging enabled: first 256 MiB identity-mapped." build/qemu-serial.log
+grep -F "PAE paging enabled; NX user-page enforcement active." build/qemu-serial.log
 grep -F "Persistent BreadFS mounted." build/qemu-serial.log
 grep -F "bread>" build/qemu-serial.log
 grep -F "BreadOS native user-mode application." build/qemu-serial.log
 grep -F "BreadOS isolation test: attempting protected supervisor-memory write." build/qemu-serial.log
 grep -F "Commands: help, menu" build/qemu-serial.log
 grep -F "PASS: another user process could not modify victim memory." build/qemu-serial.log
-if grep -Fq "FAIL: another user process modified victim memory." build/qemu-serial.log || grep -Fq "FAIL: attacker could not send IPC to victim." build/qemu-serial.log; then
+grep -F "W^X task id: 4" build/qemu-serial.log
+grep -F "PASS: writable data write succeeded." build/qemu-serial.log
+grep -F "W^X test: attempting to execute writable data." build/qemu-serial.log
+grep -F "Commands: help, menu" build/qemu-serial.log
+if grep -Fq "FAIL: another user process modified victim memory." build/qemu-serial.log || grep -Fq "FAIL: attacker could not send IPC to victim." build/qemu-serial.log || grep -Fq "FAIL: writable data executed as code." build/qemu-serial.log; then
+  grep -E "FAIL: (another user process|attacker could not|writable data)" build/qemu-serial.log >&2 || true
   echo "User processes were not isolated correctly." >&2
   exit 1
 fi
@@ -126,7 +173,7 @@ grep -F "Scheduler smoke test passed: round-robin task switching verified." buil
 grep -F "URing-3 process and syscall smoke test passed." build/qemu-serial.log
 # Boot a second time without replacing the image; the volume must mount, not format.
 set +e
-timeout 8s qemu-system-i386 -display none -monitor none -no-reboot -no-shutdown -serial stdio \
+timeout 8s qemu-system-i386 -cpu qemu32,+pae,+nx -display none -monitor none -no-reboot -no-shutdown -serial stdio \
   -drive file=build/breados-disk.img,format=raw,if=ide,index=0 -cdrom build/breados.iso > build/qemu-serial-second.log 2>&1
 status=$?
 set -e

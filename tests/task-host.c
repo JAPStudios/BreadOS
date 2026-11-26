@@ -9,7 +9,8 @@ static uint32_t kernel_switches;
 static uint32_t active_kernel_stack;
 void gdt_set_kernel_stack(uint32_t stack_top) { active_kernel_stack = stack_top; }
 int paging_switch_address_space(const struct paging_address_space *space) {
-    if (!space || !space->directory_physical || !space->user_table_physical) return -1;
+    if (!space || !space->directory_physical || !space->user_directory_physical ||
+        !space->user_table_physical[0] || !space->user_table_physical[1]) return -1;
     active_directory = space->directory_physical;
     return 0;
 }
@@ -29,7 +30,7 @@ int main(void) {
     assert(active_directory == 0);
     assert(task_set_kernel_stack(0x3000u) == 0);
     assert(active_kernel_stack == 0x3000u);
-    struct paging_address_space user_space = {0x1000u, 0x2000u};
+    struct paging_address_space user_space = {0x1000u, 0x2000u, {0x3000u, 0x4000u}};
     assert(task_set_address_space(&user_space) == 0);
 
     uint32_t *a = task_schedule(shell_frame);
@@ -61,6 +62,8 @@ int main(void) {
     assert(task_switch_count() == 6);
     assert(kernel_switches == 4);
 
+    user_frame[11]=0x1Bu;
+    assert(task_create_user(user_frame,&user_space,0)==-1);
     int id = task_create_user(user_frame, &user_space, 0x5000u);
     assert(id == 3);
     assert(task_schedule(shell_frame) == worker_a_frame);
@@ -69,6 +72,7 @@ int main(void) {
     assert(task_current_id() == (uint32_t)id);
     assert(active_directory == user_space.directory_physical);
     assert(active_kernel_stack == 0x5000u);
+    assert(user_frame[11] == 0x1Bu);
 
     assert(task_terminate_current(9) == 0);
     assert(task_is_zombie((uint32_t)id));
@@ -84,6 +88,7 @@ int main(void) {
     assert(task_schedule(shell_frame) == worker_a_frame);
     assert(task_schedule(worker_a_frame) == worker_b_frame);
     assert(task_schedule(worker_b_frame) == user_frame);
+    assert(user_frame[11] == 0x1Bu);
     assert(task_terminate_current(-11) == 0);
     assert(task_schedule(user_frame) == shell_frame);
     assert(task_exit_code((uint32_t)reused) == -11);

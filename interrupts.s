@@ -87,7 +87,7 @@ isr_common:
     addl $8, %esp
     /* Select flat data segments for the task whose iret frame was chosen. */
     pushl %eax
-    testb $3, 8(%esp)
+    testb $3, 4(%esp)
     jz 1f
     movw $0x23, %ax
     jmp 2f

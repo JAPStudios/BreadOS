@@ -73,6 +73,8 @@ int elf32_inspect(const void *data, size_t size, struct elf32_image *image) {
 
     uint32_t load_count = 0;
     int entry_executable = 0;
+    uint64_t highest_executable_end = 0;
+    uint64_t lowest_writable_start = UINT64_MAX;
     for (uint16_t i = 0; i < phnum; ++i) {
         const uint8_t *ph = b + phoff + (size_t)i * ELF_PROGRAM_HEADER_SIZE;
         uint32_t type = read32(ph);
@@ -106,20 +108,53 @@ int elf32_inspect(const void *data, size_t size, struct elf32_image *image) {
             int result = read_load_segment(image, j, &prior);
             if (result != 0) continue;
             uint64_t prior_end = (uint64_t)prior.virtual_address + prior.memory_size;
-            if ((uint64_t)seg.virtual_address < prior_end &&
-                (uint64_t)prior.virtual_address < seg_end)
+            uint64_t seg_page_end = (seg_end + ELF_PAGE_SIZE - 1u) &
+                                    ~((uint64_t)ELF_PAGE_SIZE - 1u);
+            uint64_t prior_page_end = (prior_end + ELF_PAGE_SIZE - 1u) &
+                                      ~((uint64_t)ELF_PAGE_SIZE - 1u);
+            if ((uint64_t)seg.virtual_address < prior_page_end &&
+                (uint64_t)prior.virtual_address < seg_page_end)
                 return -1;
         }
-        if ((seg.flags & ELF_PF_X) && image->entry >= seg.virtual_address &&
-            (uint64_t)image->entry < seg_end)
-            entry_executable = 1;
+        if (seg.flags & ELF_PF_X) {
+            if (seg_end > highest_executable_end) highest_executable_end=seg_end;
+            if (image->entry >= seg.virtual_address && (uint64_t)image->entry < seg_end)
+                entry_executable = 1;
+        }
+        if ((seg.flags & ELF_PF_W) &&
+            (uint64_t)seg.virtual_address < lowest_writable_start)
+            lowest_writable_start=seg.virtual_address;
         ++load_count;
     }
-    return load_count && entry_executable ? 0 : -1;
+    uint64_t executable_page_end=(highest_executable_end+ELF_PAGE_SIZE-1u)&
+                                ~((uint64_t)ELF_PAGE_SIZE-1u);
+    if (!load_count || !entry_executable || lowest_writable_start<executable_page_end)
+        return -1;
+    return 0;
 }
 
 int elf32_load_segment_at(const struct elf32_image *image, uint16_t index,
                           struct elf32_load_segment *segment) {
     if (!image || !image->bytes || !segment) return -1;
     return read_load_segment(image, index, segment);
+}
+
+int elf32_user_code_limit(const struct elf32_image *image,uint32_t *inclusive_limit) {
+    if(!image || !image->bytes || !inclusive_limit) return -1;
+    uint64_t highest_executable_end=0;
+    for(uint16_t i=0;i<image->program_header_count;i++) {
+        struct elf32_load_segment segment;
+        int result=elf32_load_segment_at(image,i,&segment);
+        if(result==1) continue;
+        if(result<0) return -1;
+        if(segment.flags&ELF_PF_X) {
+            uint64_t end=(uint64_t)segment.virtual_address+segment.memory_size;
+            if(end>highest_executable_end) highest_executable_end=end;
+        }
+    }
+    if(highest_executable_end<=ELF32_USER_START ||
+       highest_executable_end>ELF32_USER_STACK_GUARD_PAGE)
+        return -1;
+    *inclusive_limit=(uint32_t)(highest_executable_end-1u);
+    return 0;
 }
