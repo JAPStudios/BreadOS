@@ -124,7 +124,8 @@ grep -F "Commands: help, menu" build/qemu-serial.log
 grep -F "PASS: another user process could not modify victim memory." build/qemu-serial.log
 grep -F "W^X test: attempting to execute writable data." build/qemu-serial.log
 grep -F "Commands: help, menu" build/qemu-serial.log
-if grep -Fq "FAIL: another user process modified victim memory." build/qemu-serial.log || grep -Fq "FAIL: attacker could not send IPC to victim." build/qemu-serial.log || grep -Fq "FAIL: writable data executed as code." build/qemu-serial.log; then
+if grep -Fq "FAIL: another user process modified victim memory." build/qemu-serial.log || grep -Fq "FAIL: attacker could not send IPC to victim." build/qemu-serial.log || grep -Fq "FAIL: user CS limit includes writable data." build/qemu-serial.log || grep -Fq "FAIL: user CS descriptor could not be inspected." build/qemu-serial.log || grep -Fq "FAIL: writable data executed as code." build/qemu-serial.log; then
+  grep -E "FAIL: (another user process|attacker could not|user CS|writable data)" build/qemu-serial.log >&2 || true
   echo "User processes were not isolated correctly." >&2
   exit 1
 fi
