@@ -107,7 +107,7 @@ void *paging_map_framebuffer(uint64_t physical_address,uint32_t length) {
     }
     uint64_t flags=P|RW|PWT|PCD|(nx_enabled?NX:0);
     for(uint32_t i=0;i<(uint32_t)pages;i++)
-        framebuffer_pts[i/PT_ENTRIES][i%PT_ENTRIES]=base+(uint64_t)i*PAGE_SIZE|flags;
+        framebuffer_pts[i/PT_ENTRIES][i%PT_ENTRIES]=(base+(uint64_t)i*PAGE_SIZE)|flags;
     uint32_t count=((uint32_t)pages+PT_ENTRIES-1u)/PT_ENTRIES;
     for(uint32_t t=0;t<count;t++)
         kernel_pd3[FB_PDE+t]=(uint64_t)(uintptr_t)&framebuffer_pts[t][0]|P|RW;
