@@ -162,6 +162,12 @@ int vfs_mount(const char *mount_path,enum vfs_backend backend) {
            !is_directory) return -1;
     }
 
+    size_t mount_length=str_len(normalized);
+    for(uint32_t i=0;i<VFS_MOUNT_MAX;i++) {
+        if(!mounts[i].used) continue;
+        if(str_starts(mounts[i].path,normalized) && mounts[i].path[mount_length]=='/')
+            return -1;
+    }
     for(uint32_t i=0;i<VFS_MOUNT_MAX;i++) {
         if(mounts[i].used) continue;
         mounts[i].backend=backend;
