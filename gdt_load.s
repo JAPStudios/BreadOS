@@ -13,7 +13,7 @@ gdt_load:
     movw %ax, %ss
     movw %ax, %fs
     movw %ax, %gs
-    movw $0x48, %ax
+    movw $0x28, %ax
     ltr %ax
     movw $0, %ax
     lldt %ax
