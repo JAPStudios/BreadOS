@@ -36,9 +36,9 @@ void _start(void) {
 
     /* Reload the current user CS from the updated GDT descriptor. */
     __asm__ volatile (
-        "pushl $0x1B\\n\\t"
-        "pushl $1f\\n\\t"
-        "lret\\n"
+        "pushl $0x1B\n\t"
+        "pushl $1f\n\t"
+        "lret\n"
         "1:"
         :
         :
