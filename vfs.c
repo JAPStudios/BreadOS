@@ -142,6 +142,17 @@ static int user_writable_path(const char *normalized) {
 }
 
 
+#if defined(BREADOS_HOST_TEST)
+/* Host regression tests exercise VFS logic without privileged CPU instructions. */
+static uint32_t vfs_irq_save(void) {
+    __asm__ volatile("":::"memory");
+    return 0;
+}
+static void vfs_irq_restore(uint32_t flags) {
+    (void)flags;
+    __asm__ volatile("":::"memory");
+}
+#else
 static uint32_t vfs_irq_save(void) {
     uint32_t flags;
     __asm__ volatile("pushfl; popl %0; cli":"=r"(flags)::"memory");
@@ -151,6 +162,7 @@ static void vfs_irq_restore(uint32_t flags) {
     __asm__ volatile("":::"memory");
     if(flags&(1u<<9)) __asm__ volatile("sti":::"memory");
 }
+#endif
 
 int vfs_mount(const char *mount_path,enum vfs_backend backend) {
     char normalized[VFS_PATH_MAX+1u];
