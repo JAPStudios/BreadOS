@@ -148,6 +148,7 @@ static uint32_t vfs_irq_save(void) {
     return flags;
 }
 static void vfs_irq_restore(uint32_t flags) {
+    __asm__ volatile("":::"memory");
     if(flags&(1u<<9)) __asm__ volatile("sti":::"memory");
 }
 
