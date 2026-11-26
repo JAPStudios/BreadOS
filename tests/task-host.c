@@ -104,6 +104,8 @@ int main(void) {
     assert(active_directory == 0);
     assert(active_ldt_task == 0u);
     assert(task_destroy((uint32_t)id) == 0);
+    assert(user_code_limits[id] == 0u);
+    assert(user_code_selectors[id] == 0u);
     assert(!task_is_zombie((uint32_t)id));
 
     int reused = task_create_user(user_frame, &user_space, 0x6000u, 0x40002FFFu);

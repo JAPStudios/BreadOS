@@ -174,7 +174,7 @@ int task_destroy(uint32_t task_id) {
     tasks[task_id].address_space.directory_physical = 0;
     tasks[task_id].address_space.user_table_physical = 0;
     tasks[task_id].kernel_stack_top = 0;
-    gdt_set_user_code_limit(task_id,USER_CODE_MAX);
+    gdt_release_user_code(task_id);
     tasks[task_id].exit_code = 0;
     ipc_remove_sender(task_id);
     ipc_reset_task(task_id);
