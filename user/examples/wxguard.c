@@ -26,6 +26,14 @@ void _start(void) {
     uint32_t code_limit=0;
     uint8_t limit_valid=0;
     __asm__ volatile ("movw %%cs, %0" : "=rm"(selector));
+    static const char selector_prefix[]="W^X code selector: 0x";
+    static const char hex_digits[]="0123456789ABCDEF";
+    (void)bread_write(selector_prefix,(uint32_t)(sizeof(selector_prefix)-1u));
+    (void)bread_write_char((uint8_t)hex_digits[(selector>>12)&0x0Fu]);
+    (void)bread_write_char((uint8_t)hex_digits[(selector>>8)&0x0Fu]);
+    (void)bread_write_char((uint8_t)hex_digits[(selector>>4)&0x0Fu]);
+    (void)bread_write_char((uint8_t)hex_digits[selector&0x0Fu]);
+    (void)bread_write_char('\\n');
     if ((selector&0x07u)!=0x07u) {
         (void)bread_write(bad_selector,(uint32_t)(sizeof(bad_selector)-1u));
         bread_exit(3);
