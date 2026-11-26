@@ -119,7 +119,9 @@ int task_create_user(uint32_t *initial_frame,
         return -1;
     for (uint32_t i = TASK_KERNEL_COUNT; i < TASK_MAX; ++i) {
         if (tasks[i].state != TASK_UNUSED) continue;
-        gdt_set_user_code_limit(i,user_code_limit);
+        uint16_t code_selector=gdt_prepare_user_code(i,user_code_limit);
+        if (!code_selector) return -1;
+        initial_frame[11]=(uint32_t)code_selector;
         tasks[i].saved_stack = initial_frame;
         tasks[i].address_space = *space;
         tasks[i].kernel_stack_top = kernel_stack_top;

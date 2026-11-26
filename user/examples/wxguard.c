@@ -26,7 +26,7 @@ void _start(void) {
     uint32_t code_limit=0;
     uint8_t limit_valid=0;
     __asm__ volatile ("movw %%cs, %0" : "=rm"(selector));
-    if (selector!=0x0Fu) {
+    if ((selector&0x07u)!=0x07u) {
         (void)bread_write(bad_selector,(uint32_t)(sizeof(bad_selector)-1u));
         bread_exit(3);
     }
