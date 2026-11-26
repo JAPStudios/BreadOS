@@ -134,7 +134,7 @@ send_text("help\n")
 if not wait_for_text("Commands: help, menu",offset=offset):
     fail("Kernel shell did not remain responsive after task-slot reuse")
 monitor.close()
-PYPY
+PY
 set +e
 wait "$qemu_pid"
 status=$?
