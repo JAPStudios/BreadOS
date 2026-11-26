@@ -115,6 +115,14 @@ static int resolve_path(const char *input,enum vfs_backend *backend,
     return 0;
 }
 
+
+static int user_task(void) {
+    return task_current_id()>=TASK_KERNEL_COUNT;
+}
+static int user_writable_path(const char *normalized) {
+    return normalized && str_starts(normalized,"tmp/") && normalized[4]!=0;
+}
+
 int vfs_mount(const char *mount_path,enum vfs_backend backend) {
     char normalized[VFS_PATH_MAX+1u];
     if (normalize_path(mount_path,normalized)<0 ||
@@ -140,6 +148,8 @@ void vfs_init(void) {
     (void)vfs_mount("/",pfs_ready()?VFS_BACKEND_BREADFS:VFS_BACKEND_RAM);
     (void)vfs_mount("/dev",VFS_BACKEND_DEV);
     (void)vfs_mount("/proc",VFS_BACKEND_PROC);
+    if(pfs_ready()) (void)pfs_mkdir("tmp");
+    else (void)fs_mkdir("tmp");
 }
 
 static size_t backend_count(enum vfs_backend backend) {
@@ -300,8 +310,13 @@ int vfs_open(const char *path,uint32_t flags) {
     if(str_len(relative)>FS_NAME_MAX)return -1;
     int is_directory=0;
     int exists=backend_exists(backend,relative,&is_directory);
-    if(!exists && (flags&VFS_O_CREATE) && !backend_parent_exists(backend,relative))return -1;
     if(is_directory) return -1;
+    if(user_task() && (flags&(VFS_O_WRITE|VFS_O_CREATE|VFS_O_TRUNCATE)) &&
+       !user_writable_path(normalized))
+        return -1;
+    if(!exists && (flags&VFS_O_CREATE) && !backend_parent_exists(backend,relative))
+        return -1;
+    if(!exists && !(flags&VFS_O_CREATE)) return -1;
     if(flags&VFS_O_BINARY) {
         if(backend!=VFS_BACKEND_BREADFS) return -1;
         if(exists) {
@@ -425,7 +440,9 @@ int vfs_stat_path(const char *path,struct vfs_stat *status) {
     if(!status) return -1;
     enum vfs_backend backend;const char *relative;char normalized[VFS_PATH_MAX+1u];
     if(resolve_path(path,&backend,&relative,normalized)<0) return -1;
-    if(!*relative) { status->type=VFS_NODE_DIRECTORY;status->size=0;return 0; }
+    if(!*relative) {
+        status->type=VFS_NODE_DIRECTORY;status->size=0;return 0;
+    }
     if(backend==VFS_BACKEND_DEV) {
         if(!device_id(relative))return -1;
         status->type=VFS_NODE_DEVICE;status->size=0;return 0;
@@ -436,7 +453,8 @@ int vfs_stat_path(const char *path,struct vfs_stat *status) {
     }
     int is_directory=0;
     if(!backend_exists(backend,relative,&is_directory))return -1;
-    status->type=is_directory?VFS_NODE_DIRECTORY:VFS_NODE_FILE;
+    enum vfs_node_type type=is_directory?VFS_NODE_DIRECTORY:VFS_NODE_FILE;
+    status->type=type;
     status->size=0;
     return 0;
 }
@@ -508,24 +526,31 @@ static int resolve_backend_mutation(const char *path,enum vfs_backend *backend,
 }
 int vfs_mkdir(const char *path) {
     enum vfs_backend b;const char *r;char n[VFS_PATH_MAX+1u];
-    if(resolve_backend_mutation(path,&b,&r,n)<0) return -1;
-    return b==VFS_BACKEND_BREADFS?pfs_mkdir(r):fs_mkdir(r);
+    if(resolve_backend_mutation(path,&b,&r,n)<0 ||
+       (user_task() && !user_writable_path(n))) return -1;
+    int result=b==VFS_BACKEND_BREADFS?pfs_mkdir(r):fs_mkdir(r);
+    if(result<0) return result;
+    return 0;
 }
 int vfs_unlink(const char *path) {
     enum vfs_backend b;const char *r;char n[VFS_PATH_MAX+1u];
-    if(resolve_backend_mutation(path,&b,&r,n)<0) return -1;
+    if(resolve_backend_mutation(path,&b,&r,n)<0 ||
+       (user_task() && !user_writable_path(n))) return -1;
     return b==VFS_BACKEND_BREADFS?pfs_remove(r):fs_remove(r);
 }
 int vfs_rmdir(const char *path) {
     enum vfs_backend b;const char *r;char n[VFS_PATH_MAX+1u];
-    if(resolve_backend_mutation(path,&b,&r,n)<0) return -1;
+    if(resolve_backend_mutation(path,&b,&r,n)<0 ||
+       (user_task() && !user_writable_path(n))) return -1;
     return b==VFS_BACKEND_BREADFS?pfs_rmdir(r):fs_rmdir(r);
 }
 int vfs_rename(const char *source,const char *destination) {
     enum vfs_backend sb,db;const char *sr,*dr;
     char sn[VFS_PATH_MAX+1u],dn[VFS_PATH_MAX+1u];
     if(resolve_backend_mutation(source,&sb,&sr,sn)<0 ||
-       resolve_backend_mutation(destination,&db,&dr,dn)<0 || sb!=db) return -1;
+       resolve_backend_mutation(destination,&db,&dr,dn)<0 || sb!=db ||
+       (user_task() && (!user_writable_path(sn) || !user_writable_path(dn))))
+        return -1;
     return sb==VFS_BACKEND_BREADFS?pfs_move(sr,dr):fs_move(sr,dr);
 }
 
