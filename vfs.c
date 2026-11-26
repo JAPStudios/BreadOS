@@ -157,6 +157,7 @@ int vfs_mount(const char *mount_path,enum vfs_backend backend) {
        backend<VFS_BACKEND_RAM || backend>VFS_BACKEND_PROC) return -1;
     uint32_t generation=mount_generation;
     int parent_index=-1;
+    enum vfs_backend parent_backend=VFS_BACKEND_RAM;
     const char *parent_relative=0;
     char parent_normalized[VFS_PATH_MAX+1u];
 
@@ -170,7 +171,6 @@ int vfs_mount(const char *mount_path,enum vfs_backend backend) {
     } else {
         if((backend!=VFS_BACKEND_RAM && backend!=VFS_BACKEND_BREADFS) ||
            (backend==VFS_BACKEND_BREADFS && !pfs_ready())) return -1;
-        enum vfs_backend parent_backend;
         int is_directory=0;
         if(resolve_path(mount_path,&parent_backend,&parent_relative,parent_normalized)<0 ||
            !*parent_relative || !backend_exists(parent_backend,parent_relative,&is_directory) ||
