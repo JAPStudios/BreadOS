@@ -33,7 +33,7 @@ void _start(void) {
     (void)bread_write_char((uint8_t)hex_digits[(selector>>8)&0x0Fu]);
     (void)bread_write_char((uint8_t)hex_digits[(selector>>4)&0x0Fu]);
     (void)bread_write_char((uint8_t)hex_digits[selector&0x0Fu]);
-    (void)bread_write_char('\\n');
+    (void)bread_write_char('\n');
     if ((selector&0x07u)!=0x07u) {
         (void)bread_write(bad_selector,(uint32_t)(sizeof(bad_selector)-1u));
         bread_exit(3);
