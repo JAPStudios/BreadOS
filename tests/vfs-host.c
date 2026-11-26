@@ -180,6 +180,29 @@ int main(void) {
     active_task_id=0;
     assert(vfs_rmdir("/system")==0);
     assert(vfs_unlink("/root-owned.txt")==0);
+
+    /* Mount lifecycle rejects reserved mounts, open handles and nested mounts. */
+    assert(vfs_unmount("/")<0);
+    assert(vfs_unmount("/dev")<0);
+    assert(vfs_unmount("/proc")<0);
+    assert(vfs_mkdir("/mnt")==0);
+    assert(vfs_mount("/mnt",VFS_BACKEND_RAM)==0);
+    fd=vfs_open("/mnt/m.txt",VFS_O_WRITE|VFS_O_CREATE|VFS_O_TRUNCATE);
+    assert(fd>=0);
+    assert(vfs_write(fd,"data",4)==4);
+    assert(vfs_unmount("/mnt")<0);
+    assert(vfs_close(fd)==0);
+    assert(vfs_mkdir("/mnt/child")==0);
+    assert(vfs_mount("/mnt/child",VFS_BACKEND_RAM)==0);
+    assert(vfs_unmount("/mnt")<0);
+    assert(vfs_unmount("/mnt/child")==0);
+    assert(vfs_unmount("/mnt")==0);
+    assert(vfs_read_all("/m.txt",buffer,sizeof(buffer),0)==4);
+    assert(strcmp(buffer,"data")==0);
+    assert(vfs_unlink("/m.txt")==0);
+    assert(vfs_rmdir("/child")==0);
+    assert(vfs_rmdir("/mnt")==0);
+
     active_task_id=0;
     return 0;
 }
