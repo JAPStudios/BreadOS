@@ -8,12 +8,11 @@ static uint32_t active_directory;
 static uint32_t kernel_switches;
 static uint32_t active_kernel_stack;
 static uint32_t user_code_limits[TASK_MAX];
-uint16_t gdt_user_code_selector(uint32_t task_id) {
-    if (task_id<TASK_KERNEL_COUNT || task_id>=TASK_MAX) return 0;
-    uint32_t index=task_id==TASK_KERNEL_COUNT?3u:task_id+1u;
-    return (uint16_t)((index<<3)|3u);
-}
+static uint32_t active_ldt_task;
 void gdt_set_kernel_stack(uint32_t stack_top) { active_kernel_stack = stack_top; }
+void gdt_load_task_ldt(uint32_t task_id) {
+    active_ldt_task=(task_id>=TASK_KERNEL_COUNT && task_id<TASK_MAX)?task_id:0u;
+}
 void gdt_set_user_code_limit(uint32_t task_id,uint32_t limit) {
     assert(task_id<TASK_MAX);
     user_code_limits[task_id]=limit;
@@ -33,11 +32,6 @@ int main(void) {
     uint32_t worker_a_frame[16] = {0};
     uint32_t worker_b_frame[16] = {0};
     uint32_t user_frame[16] = {0};
-
-    assert(gdt_user_code_selector(2u)==0u);
-    assert(gdt_user_code_selector(3u)==0x1Bu);
-    assert(gdt_user_code_selector(4u)==0x2Bu);
-    assert(gdt_user_code_selector(7u)==0x43u);
 
     tasking_init();
     assert(task_switch_count() == 0);
@@ -76,6 +70,7 @@ int main(void) {
     assert(task_switch_count() == 6);
     assert(kernel_switches == 4);
 
+    user_frame[11]=0x0Fu;
     assert(task_create_user(user_frame,&user_space,0x5000u,0x3FFFFFFFu)==-1);
     assert(task_create_user(user_frame,&user_space,0x5000u,0x40400000u)==-1);
     int id = task_create_user(user_frame, &user_space, 0x5000u, 0x40001FFFu);
@@ -87,7 +82,8 @@ int main(void) {
     assert(active_directory == user_space.directory_physical);
     assert(active_kernel_stack == 0x5000u);
     assert(user_code_limits[id] == 0x40001FFFu);
-    assert(user_frame[11] == gdt_user_code_selector((uint32_t)id));
+    assert(user_frame[11] == 0x0Fu);
+    assert(active_ldt_task == (uint32_t)id);
 
     assert(task_terminate_current(9) == 0);
     assert(task_is_zombie((uint32_t)id));
@@ -95,6 +91,7 @@ int main(void) {
     assert(task_schedule(user_frame) == shell_frame);
     assert(task_current_id() == 0);
     assert(active_directory == 0);
+    assert(active_ldt_task == 0u);
     assert(task_destroy((uint32_t)id) == 0);
     assert(!task_is_zombie((uint32_t)id));
 
@@ -104,7 +101,8 @@ int main(void) {
     assert(task_schedule(worker_a_frame) == worker_b_frame);
     assert(task_schedule(worker_b_frame) == user_frame);
     assert(user_code_limits[reused] == 0x40002FFFu);
-    assert(user_frame[11] == gdt_user_code_selector((uint32_t)reused));
+    assert(user_frame[11] == 0x0Fu);
+    assert(active_ldt_task == (uint32_t)reused);
     assert(task_terminate_current(-11) == 0);
     assert(task_schedule(user_frame) == shell_frame);
     assert(task_exit_code((uint32_t)reused) == -11);

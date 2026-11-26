@@ -3,11 +3,12 @@
 #include <stddef.h>
 
 #define GDT_ENTRIES 10u
-#define KERNEL_CODE_SELECTOR 0x08u
 #define KERNEL_DATA_SELECTOR 0x10u
-#define USER_DATA_SELECTOR   0x23u
-#define USER_TASK_FIRST      3u
-#define USER_TASK_END        8u
+#define USER_TASK_FIRST 3u
+#define USER_TASK_END 8u
+#define USER_CODE_MIN 0x40000000u
+#define USER_CODE_MAX 0x403FFFFFu
+#define LDT_ENTRIES 2u
 
 struct gdt_entry {
     uint16_t limit_low;
@@ -43,72 +44,84 @@ struct tss32 {
 } __attribute__((packed));
 
 static struct gdt_entry gdt[GDT_ENTRIES];
+static struct gdt_entry user_ldt[USER_TASK_END-USER_TASK_FIRST][LDT_ENTRIES];
 static struct tss32 tss;
 extern void gdt_load(const struct gdt_pointer *pointer);
 
-static void set_entry(unsigned index, uint32_t base, uint32_t limit,
-                      uint8_t access, uint8_t flags) {
-    gdt[index].limit_low = (uint16_t)(limit & 0xFFFFu);
-    gdt[index].base_low = (uint16_t)(base & 0xFFFFu);
-    gdt[index].base_middle = (uint8_t)((base >> 16) & 0xFFu);
-    gdt[index].access = access;
-    gdt[index].granularity = (uint8_t)(((limit >> 16) & 0x0Fu) | (flags & 0xF0u));
-    gdt[index].base_high = (uint8_t)((base >> 24) & 0xFFu);
+static void set_entry(struct gdt_entry *table,unsigned index,
+                      uint32_t base,uint32_t limit,
+                      uint8_t access,uint8_t flags) {
+    table[index].limit_low=(uint16_t)(limit&0xFFFFu);
+    table[index].base_low=(uint16_t)(base&0xFFFFu);
+    table[index].base_middle=(uint8_t)((base>>16)&0xFFu);
+    table[index].access=access;
+    table[index].granularity=(uint8_t)(((limit>>16)&0x0Fu)|(flags&0xF0u));
+    table[index].base_high=(uint8_t)((base>>24)&0xFFu);
+}
+
+static unsigned user_ldt_slot(uint32_t task_id) {
+    if (task_id<USER_TASK_FIRST || task_id>=USER_TASK_END) return USER_TASK_END;
+    return task_id-USER_TASK_FIRST;
+}
+
+/* GDT index 4 remains the shared flat user-data descriptor. */
+static unsigned user_ldt_gdt_index(uint32_t task_id) {
+    unsigned slot=user_ldt_slot(task_id);
+    if (slot>=USER_TASK_END-USER_TASK_FIRST) return 0;
+    return slot==0u ? 3u : slot+4u;
 }
 
 void gdt_set_kernel_stack(uint32_t stack_pointer) {
-    tss.esp0 = stack_pointer;
+    tss.esp0=stack_pointer;
 }
 
-/*
- * Give each ring-3 task a distinct GDT code descriptor. Slot 3 keeps the
- * original selector 0x1B; slot 4 is reserved for the shared user data segment.
- */
-static unsigned user_code_index(uint32_t task_id) {
-    if (task_id<USER_TASK_FIRST || task_id>=USER_TASK_END) return 0;
-    return task_id==USER_TASK_FIRST ? 3u : task_id+1u;
-}
-
-uint16_t gdt_user_code_selector(uint32_t task_id) {
-    unsigned index=user_code_index(task_id);
-    return index ? (uint16_t)((index<<3)|3u) : 0;
-}
-
-/* The i386 user CS limit is rounded to 4 KiB pages by the G bit. */
+/* Each process has its own LDT code descriptor; user mode cannot load another LDTR. */
 void gdt_set_user_code_limit(uint32_t task_id,uint32_t inclusive_limit) {
-    unsigned index=user_code_index(task_id);
-    if (!index || inclusive_limit<0x40000000u ||
-        inclusive_limit>0x403FFFFFu) return;
+    unsigned slot=user_ldt_slot(task_id);
+    if (slot>=USER_TASK_END-USER_TASK_FIRST ||
+        inclusive_limit<USER_CODE_MIN || inclusive_limit>USER_CODE_MAX)
+        return;
     uint32_t encoded=inclusive_limit>>12;
-    gdt[index].limit_low=(uint16_t)(encoded&0xFFFFu);
-    gdt[index].granularity=(uint8_t)((gdt[index].granularity&0xF0u)|
-                                      ((encoded>>16)&0x0Fu));
+    user_ldt[slot][1].limit_low=(uint16_t)(encoded&0xFFFFu);
+    user_ldt[slot][1].granularity=(uint8_t)(
+        (user_ldt[slot][1].granularity&0xF0u)|((encoded>>16)&0x0Fu));
+}
+
+/* Load this task's private LDT, or clear LDTR for a kernel task. */
+void gdt_load_task_ldt(uint32_t task_id) {
+    unsigned index=user_ldt_gdt_index(task_id);
+    uint16_t selector=index ? (uint16_t)(index<<3) : 0u;
+    __asm__ volatile ("lldt %0" : : "rm"(selector) : "memory");
 }
 
 void gdt_init(void) {
-    for (unsigned i = 0; i < GDT_ENTRIES; ++i) {
-        set_entry(i, 0, 0, 0, 0);
-    }
+    for (unsigned i=0;i<GDT_ENTRIES;i++)
+        set_entry(gdt,i,0,0,0,0);
 
-    /* Kernel code/data, one user data segment, and one code segment per user task. */
-    set_entry(1, 0, 0xFFFFFu, 0x9Au, 0xC0u);
-    set_entry(2, 0, 0xFFFFFu, 0x92u, 0xC0u);
-    set_entry(4, 0, 0xFFFFFu, 0xF2u, 0xC0u);
+    /* Flat kernel code/data and shared flat user data. */
+    set_entry(gdt,1,0,0xFFFFFu,0x9Au,0xC0u);
+    set_entry(gdt,2,0,0xFFFFFu,0x92u,0xC0u);
+    set_entry(gdt,4,0,0xFFFFFu,0xF2u,0xC0u);
+
     for (uint32_t task_id=USER_TASK_FIRST;task_id<USER_TASK_END;task_id++) {
-        unsigned index=user_code_index(task_id);
-        set_entry(index,0,0xFFFFFu,0xFAu,0xC0u);
+        unsigned slot=user_ldt_slot(task_id);
+        unsigned gdt_index=user_ldt_gdt_index(task_id);
+        set_entry(user_ldt[slot],0,0,0,0,0);
+        set_entry(user_ldt[slot],1,0,0xFFFFFu,0xFAu,0xC0u);
+        /* LDT system descriptors are DPL 0 and cannot be loaded by ring-3 code. */
+        set_entry(gdt,gdt_index,(uint32_t)(uintptr_t)user_ldt[slot],
+                  (uint32_t)sizeof(user_ldt[slot])-1u,0x82u,0x00u);
     }
 
-    for (size_t i = 0; i < sizeof(tss); ++i) {
-        ((uint8_t *)&tss)[i] = 0;
-    }
-    tss.ss0 = KERNEL_DATA_SELECTOR;
-    tss.iomap_base = (uint16_t)sizeof(tss);
-    set_entry(9, (uint32_t)(uintptr_t)&tss,
-              (uint32_t)sizeof(tss) - 1u, 0x89u, 0x00u);
+    for (size_t i=0;i<sizeof(tss);i++)
+        ((uint8_t *)&tss)[i]=0;
+    tss.ss0=KERNEL_DATA_SELECTOR;
+    tss.iomap_base=(uint16_t)sizeof(tss);
+    set_entry(gdt,9,(uint32_t)(uintptr_t)&tss,
+              (uint32_t)sizeof(tss)-1u,0x89u,0x00u);
 
-    const struct gdt_pointer pointer = {
-        (uint16_t)(sizeof(gdt) - 1u),
+    const struct gdt_pointer pointer={
+        (uint16_t)(sizeof(gdt)-1u),
         (uint32_t)(uintptr_t)gdt
     };
     gdt_load(&pointer);

@@ -4,7 +4,7 @@ static volatile uint32_t writable_data;
 
 void _start(void) {
     static const char task_prefix[]="W^X task id: ";
-    static const char selector_ok[]="PASS: W^X task loaded its private code selector.\n";
+    static const char selector_ok[]="PASS: W^X task loaded its private LDT code selector.\n";
     static const char limit_ok[]="PASS: user CS limit excludes writable data.\n";
     static const char attempt[]="W^X test: attempting to execute writable data.\n";
     static const char bad_task[]="FAIL: W^X test did not run in task slot 4.\n";
@@ -26,7 +26,7 @@ void _start(void) {
     uint32_t code_limit=0;
     uint8_t limit_valid=0;
     __asm__ volatile ("movw %%cs, %0" : "=rm"(selector));
-    if (selector!=0x2Bu) {
+    if (selector!=0x0Fu) {
         (void)bread_write(bad_selector,(uint32_t)(sizeof(bad_selector)-1u));
         bread_exit(3);
     }

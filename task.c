@@ -9,7 +9,6 @@
 #define KERNEL_CODE_SELECTOR 0x08u
 #define USER_CODE_MIN 0x40000000u
 #define USER_CODE_MAX 0x403FFFFFu
-#define TASK_INITIAL_FRAME_CS_INDEX 11u
 #define INITIAL_EFLAGS 0x202u
 
 struct task {
@@ -120,10 +119,7 @@ int task_create_user(uint32_t *initial_frame,
         return -1;
     for (uint32_t i = TASK_KERNEL_COUNT; i < TASK_MAX; ++i) {
         if (tasks[i].state != TASK_UNUSED) continue;
-        uint16_t code_selector=gdt_user_code_selector(i);
-        if (!code_selector) return -1;
         gdt_set_user_code_limit(i,user_code_limit);
-        initial_frame[TASK_INITIAL_FRAME_CS_INDEX]=(uint32_t)code_selector;
         tasks[i].saved_stack = initial_frame;
         tasks[i].address_space = *space;
         tasks[i].kernel_stack_top = kernel_stack_top;
@@ -210,6 +206,7 @@ uint32_t *task_schedule(uint32_t *frame) {
         } else {
             paging_switch_kernel_address_space();
         }
+        gdt_load_task_ldt(candidate);
         next = candidate;
         break;
     }
@@ -218,6 +215,7 @@ uint32_t *task_schedule(uint32_t *frame) {
     if (next == TASK_MAX) {
         next = 0;
         paging_switch_kernel_address_space();
+        gdt_load_task_ldt(0);
     }
 
     if (next != current_task) {
