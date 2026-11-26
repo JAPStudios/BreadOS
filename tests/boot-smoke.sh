@@ -4,7 +4,7 @@ mkdir -p build
 # Create a fresh persistent volume containing the compiled native user application.
 build/mk-breadfs-image build/breados-disk.img build/user/hello.elf build/user/guard.elf build/user/victim.elf build/user/attacker.elf build/user/wxguard.elf
 rm -f build/qemu-monitor.sock
-timeout 60s qemu-system-i386 -display none \
+timeout 60s qemu-system-i386 -cpu qemu32,+pae,+nx -display none \
   -monitor unix:build/qemu-monitor.sock,server,nowait -no-reboot -no-shutdown \
   -serial stdio -drive file=build/breados-disk.img,format=raw,if=ide,index=0 \
   -cdrom build/breados.iso > build/qemu-serial.log 2>&1 &
@@ -58,9 +58,9 @@ def wait_for_text(needle,timeout=5.0,offset=0):
     deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
         try:
-            with open(log_path,encoding="utf-8",errors="replace") as log:
+            with open(log_path,"rb") as log:
                 log.seek(offset)
-                if needle in log.read():
+                if needle.encode("utf-8") in log.read():
                     return True
         except OSError:
             pass
@@ -112,6 +112,8 @@ offset=log_offset()
 send_text("exec wxguard\n")
 if not wait_for_text("W^X task id: 4",offset=offset):
     fail("W^X test did not receive task slot 4")
+if not wait_for_text("PASS: writable data write succeeded.",offset=offset):
+    fail("W^X test could not write to its writable data page")
 if not wait_for_text("W^X test: attempting to execute writable data.",offset=offset):
     fail("W^X test application did not reach the writable-execution probe")
 
@@ -155,12 +157,11 @@ grep -F "BreadOS isolation test: attempting protected supervisor-memory write." 
 grep -F "Commands: help, menu" build/qemu-serial.log
 grep -F "PASS: another user process could not modify victim memory." build/qemu-serial.log
 grep -F "W^X task id: 4" build/qemu-serial.log
-grep -F "PASS: W^X task loaded its private LDT code selector." build/qemu-serial.log
-grep -F "PASS: user CS limit excludes writable data." build/qemu-serial.log
+grep -F "PASS: writable data write succeeded." build/qemu-serial.log
 grep -F "W^X test: attempting to execute writable data." build/qemu-serial.log
 grep -F "Commands: help, menu" build/qemu-serial.log
-if grep -Fq "FAIL: another user process modified victim memory." build/qemu-serial.log || grep -Fq "FAIL: attacker could not send IPC to victim." build/qemu-serial.log || grep -Fq "FAIL: W^X" build/qemu-serial.log || grep -Fq "FAIL: user CS" build/qemu-serial.log || grep -Fq "FAIL: writable data executed as code." build/qemu-serial.log; then
-  grep -E "FAIL: (another user process|attacker could not|W\\^X|user CS|writable data)" build/qemu-serial.log >&2 || true
+if grep -Fq "FAIL: another user process modified victim memory." build/qemu-serial.log || grep -Fq "FAIL: attacker could not send IPC to victim." build/qemu-serial.log || grep -Fq "FAIL: writable data executed as code." build/qemu-serial.log; then
+  grep -E "FAIL: (another user process|attacker could not|writable data)" build/qemu-serial.log >&2 || true
   echo "User processes were not isolated correctly." >&2
   exit 1
 fi
@@ -172,7 +173,7 @@ grep -F "Scheduler smoke test passed: round-robin task switching verified." buil
 grep -F "URing-3 process and syscall smoke test passed." build/qemu-serial.log
 # Boot a second time without replacing the image; the volume must mount, not format.
 set +e
-timeout 8s qemu-system-i386 -display none -monitor none -no-reboot -no-shutdown -serial stdio \
+timeout 8s qemu-system-i386 -cpu qemu32,+pae,+nx -display none -monitor none -no-reboot -no-shutdown -serial stdio \
   -drive file=build/breados-disk.img,format=raw,if=ide,index=0 -cdrom build/breados.iso > build/qemu-serial-second.log 2>&1
 status=$?
 set -e
