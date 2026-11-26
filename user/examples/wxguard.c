@@ -33,6 +33,17 @@ void _start(void) {
         bread_exit(3);
     }
     (void)bread_write(limit_passed,(uint32_t)(sizeof(limit_passed)-1u));
+
+    /* Reload the current user CS from the updated GDT descriptor. */
+    __asm__ volatile (
+        "pushl $0x1B\\n\\t"
+        "pushl $1f\\n\\t"
+        "lret\\n"
+        "1:"
+        :
+        :
+        : "memory"
+    );
     (void)bread_write(attempt,(uint32_t)(sizeof(attempt)-1u));
 
     volatile uint8_t *code_bytes=(volatile uint8_t *)(uintptr_t)&writable_data;
