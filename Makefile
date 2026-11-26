@@ -124,7 +124,7 @@ $(BUILD)/keyboard-host-test: tests/keyboard-host.c kernel/keyboard.c kernel/keyb
 $(BUILD)/task-host-test: tests/task-host.c task.c task.h paging.h ipc.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/task-host.c task.c -o $@
 $(BUILD)/vfs-host-test: tests/vfs-host.c vfs.c fs.c vfs.h fs.h | $(BUILD)
-	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/vfs-host.c vfs.c fs.c -o $@
+	$(HOSTCC) -DBREADOS_HOST_TEST -std=c11 -Wall -Wextra -Werror -O2 -I. tests/vfs-host.c vfs.c fs.c -o $@
 $(BUILD)/ipc-host-test: tests/ipc-host.c ipc.c ipc.h task.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -I. tests/ipc-host.c ipc.c -o $@
 $(BUILD)/mouse-host-test: tests/mouse-host.c kernel/mouse.c kernel/mouse.h | $(BUILD)
@@ -160,7 +160,7 @@ $(BUILD)/ipc-host-sanitize-test: tests/ipc-host.c ipc.c ipc.h task.h | $(BUILD)
 $(BUILD)/syscall-host-sanitize-test: tests/syscall-host.c syscall.c syscall.h task.h paging.h ipc.h console.h vfs.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/syscall-host.c syscall.c -o $@
 $(BUILD)/vfs-host-sanitize-test: tests/vfs-host.c vfs.c fs.c vfs.h fs.h | $(BUILD)
-	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/vfs-host.c vfs.c fs.c -o $@
+	$(HOSTCC) -DBREADOS_HOST_TEST -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/vfs-host.c vfs.c fs.c -o $@
 $(BUILD)/elf-loader-host-sanitize-test: tests/elf-loader-host.c elf_loader.c elf_loader.h | $(BUILD)
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/elf-loader-host.c elf_loader.c -o $@
 $(BUILD)/filesystem-host-sanitize-test: tests/filesystem-host.c fs.c pfs.c fs.h pfs.h ata.h | $(BUILD)
