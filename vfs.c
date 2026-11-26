@@ -141,12 +141,24 @@ static int user_writable_path(const char *normalized) {
     return normalized && str_starts(normalized,"tmp/") && normalized[4]!=0;
 }
 
+
+static uint32_t vfs_irq_save(void) {
+    uint32_t flags;
+    __asm__ volatile("pushfl; popl %0; cli":"=r"(flags)::"memory");
+    return flags;
+}
+static void vfs_irq_restore(uint32_t flags) {
+    if(flags&(1u<<9)) __asm__ volatile("sti":::"memory");
+}
+
 int vfs_mount(const char *mount_path,enum vfs_backend backend) {
     char normalized[VFS_PATH_MAX+1u];
     if(!mount_path || mount_path[0]!='/' || normalize_path(mount_path,normalized)<0 ||
        backend<VFS_BACKEND_RAM || backend>VFS_BACKEND_PROC) return -1;
-    for(uint32_t i=0;i<VFS_MOUNT_MAX;i++)
-        if(mounts[i].used && str_eq(mounts[i].path,normalized)) return -1;
+    uint32_t generation=mount_generation;
+    int parent_index=-1;
+    const char *parent_relative=0;
+    char parent_normalized[VFS_PATH_MAX+1u];
 
     if(!*normalized) {
         if(backend!=VFS_BACKEND_RAM && backend!=VFS_BACKEND_BREADFS) return -1;
@@ -156,29 +168,34 @@ int vfs_mount(const char *mount_path,enum vfs_backend backend) {
     } else if(str_eq(normalized,"proc")) {
         if(backend!=VFS_BACKEND_PROC) return -1;
     } else {
-        if(backend!=VFS_BACKEND_RAM && backend!=VFS_BACKEND_BREADFS) return -1;
-        if(backend==VFS_BACKEND_BREADFS && !pfs_ready()) return -1;
+        if((backend!=VFS_BACKEND_RAM && backend!=VFS_BACKEND_BREADFS) ||
+           (backend==VFS_BACKEND_BREADFS && !pfs_ready())) return -1;
         enum vfs_backend parent_backend;
-        const char *parent_relative;
-        char parent_normalized[VFS_PATH_MAX+1u];
         int is_directory=0;
         if(resolve_path(mount_path,&parent_backend,&parent_relative,parent_normalized)<0 ||
            !*parent_relative || !backend_exists(parent_backend,parent_relative,&is_directory) ||
            !is_directory) return -1;
-        int parent_index=mount_index_for_path(parent_normalized);
+        parent_index=mount_index_for_path(parent_normalized);
         if(parent_index<0) return -1;
+    }
+
+    uint32_t irq_flags=vfs_irq_save();
+    int result=-1;
+    if(generation!=mount_generation) goto mount_done;
+    for(uint32_t i=0;i<VFS_MOUNT_MAX;i++) {
+        if(!mounts[i].used) continue;
+        if(str_eq(mounts[i].path,normalized)) goto mount_done;
+        size_t n=str_len(normalized);
+        if(str_starts(mounts[i].path,normalized) && mounts[i].path[n]=='/')
+            goto mount_done;
+    }
+    if(parent_index>=0) {
         for(uint32_t task=0;task<TASK_MAX;task++)
             for(uint32_t h=0;h<VFS_OPEN_MAX;h++)
                 if(handles[task][h].used &&
                    handles[task][h].mount_index==(uint8_t)parent_index &&
-                   path_is_under(handles[task][h].path,parent_relative)) return -1;
-    }
-
-    size_t mount_length=str_len(normalized);
-    for(uint32_t i=0;i<VFS_MOUNT_MAX;i++) {
-        if(!mounts[i].used) continue;
-        if(str_starts(mounts[i].path,normalized) && mounts[i].path[mount_length]=='/')
-            return -1;
+                   path_is_under(handles[task][h].path,parent_relative))
+                    goto mount_done;
     }
     for(uint32_t i=0;i<VFS_MOUNT_MAX;i++) {
         if(mounts[i].used) continue;
@@ -186,35 +203,42 @@ int vfs_mount(const char *mount_path,enum vfs_backend backend) {
         bytes_copy(mounts[i].path,normalized,str_len(normalized)+1u);
         mounts[i].used=1;
         ++mount_generation;
-        return 0;
+        result=0;
+        break;
     }
-    return -1;
+mount_done:
+    vfs_irq_restore(irq_flags);
+    return result;
 }
 
 int vfs_unmount(const char *mount_path) {
     char normalized[VFS_PATH_MAX+1u];
     if(!mount_path || mount_path[0]!='/' || normalize_path(mount_path,normalized)<0 ||
        !*normalized || str_eq(normalized,"dev") || str_eq(normalized,"proc")) return -1;
-    int slot=-1;
+    uint32_t irq_flags=vfs_irq_save();
+    int result=-1,slot=-1;
     for(uint32_t i=0;i<VFS_MOUNT_MAX;i++)
         if(mounts[i].used && str_eq(mounts[i].path,normalized)) {slot=(int)i;break;}
-    if(slot<0) return -1;
+    if(slot<0) goto unmount_done;
 
     size_t n=str_len(normalized);
     for(uint32_t i=0;i<VFS_MOUNT_MAX;i++) {
         if((int)i==slot || !mounts[i].used) continue;
         if(str_starts(mounts[i].path,normalized) && mounts[i].path[n]=='/')
-            return -1;
+            goto unmount_done;
     }
     for(uint32_t task=0;task<TASK_MAX;task++)
         for(uint32_t i=0;i<VFS_OPEN_MAX;i++)
             if(handles[task][i].used && handles[task][i].mount_index==(uint8_t)slot)
-                return -1;
+                goto unmount_done;
 
     mounts[slot].used=0;
     bytes_zero(mounts[slot].path,sizeof(mounts[slot].path));
     ++mount_generation;
-    return 0;
+    result=0;
+unmount_done:
+    vfs_irq_restore(irq_flags);
+    return result;
 }
 
 void vfs_init(void) {
@@ -350,6 +374,7 @@ static struct vfs_handle *handle_at(int handle) {
 }
 
 static void discard_handle(struct vfs_handle *h);
+static int commit_handle(struct vfs_handle *h,int slot,uint32_t generation);
 int vfs_open(const char *path,uint32_t flags) {
     uint32_t generation=mount_generation;
     if (!(flags&(VFS_O_READ|VFS_O_WRITE)) ||
@@ -379,16 +404,12 @@ int vfs_open(const char *path,uint32_t flags) {
             (void)build_pseudo_file(h,h->device==5u?"uptime":"meminfo");
         if((h->device==5u || h->device==6u) && (flags&VFS_O_WRITE)) return -1;
         if((flags&VFS_O_BINARY) || (flags&VFS_O_TRUNCATE)) return -1;
-        h->used=1;
-        if(generation!=mount_generation){discard_handle(h);return -1;}
-        return slot;
+        return commit_handle(h,slot,generation);
     }
     if(backend==VFS_BACKEND_PROC) {
         if(!(flags&VFS_O_READ) || (flags&(VFS_O_WRITE|VFS_O_CREATE|VFS_O_TRUNCATE|VFS_O_BINARY)) ||
            !proc_name(relative) || build_pseudo_file(h,relative)<0) return -1;
-        h->used=1;
-        if(generation!=mount_generation){discard_handle(h);return -1;}
-        return slot;
+        return commit_handle(h,slot,generation);
     }
     if(str_len(relative)>FS_NAME_MAX)return -1;
     int is_directory=0;
@@ -416,9 +437,7 @@ int vfs_open(const char *path,uint32_t flags) {
     } else if(!(flags&VFS_O_CREATE)) return -1;
     if(!exists && (flags&VFS_O_CREATE)) h->dirty=1;
     if(flags&VFS_O_TRUNCATE) { h->size=0; h->dirty=1; }
-    h->used=1;
-    if(generation!=mount_generation){discard_handle(h);return -1;}
-    return slot;
+    return commit_handle(h,slot,generation);
 }
 
 static void discard_handle(struct vfs_handle *h) {
@@ -427,6 +446,17 @@ static void discard_handle(struct vfs_handle *h) {
     h->dirty=0;
     h->mount_index=0;
     bytes_zero(h->data,sizeof(h->data));
+}
+static int commit_handle(struct vfs_handle *h,int slot,uint32_t generation) {
+    uint32_t irq_flags=vfs_irq_save();
+    if(generation!=mount_generation) {
+        discard_handle(h);
+        vfs_irq_restore(irq_flags);
+        return -1;
+    }
+    h->used=1;
+    vfs_irq_restore(irq_flags);
+    return slot;
 }
 static int finish_handle(struct vfs_handle *h) {
     if(!h || !h->used) return -1;
