@@ -22,7 +22,7 @@ struct vfs_handle {
     uint8_t used;
     uint8_t dirty;
     uint8_t device;
-    uint8_t reserved;
+    uint8_t created;
     uint32_t flags;
     uint32_t owner;
     enum vfs_backend backend;
@@ -115,6 +115,160 @@ static int resolve_path(const char *input,enum vfs_backend *backend,
     return 0;
 }
 
+
+#define VFS_ACL_MAX 16u
+#define VFS_ACL_MAGIC 0x314C4341u
+#define VFS_ACL_VERSION 1u
+#define ACL_READ 4u
+#define ACL_WRITE 2u
+#define ACL_EXEC 1u
+#define ACL_ROOT_MODE 0777u
+struct vfs_acl_record {
+    char path[VFS_PATH_MAX+1u];
+    uint32_t owner;
+    uint16_t mode;
+    uint8_t type;
+    uint8_t used;
+} __attribute__((packed));
+struct vfs_acl_disk {
+    uint32_t magic;
+    uint16_t version;
+    uint16_t count;
+    uint32_t checksum;
+    struct vfs_acl_record records[VFS_ACL_MAX];
+} __attribute__((packed));
+static struct vfs_acl_record acl_records[VFS_ACL_MAX];
+
+static uint32_t acl_current_owner(void) {
+    return task_current_id()==0u?0u:1u;
+}
+static int acl_reserved_path(const char *path) {
+    return str_eq(path,".vfsmeta");
+}
+static int acl_find(const char *path) {
+    for(uint32_t i=0;i<VFS_ACL_MAX;i++)
+        if(acl_records[i].used && str_eq(acl_records[i].path,path)) return (int)i;
+    return -1;
+}
+static void acl_get(const char *path,enum vfs_node_type type,
+                    uint32_t *owner,uint16_t *mode) {
+    if(!path || !*path) {
+        if(owner)*owner=0;
+        if(mode)*mode=ACL_ROOT_MODE;
+        return;
+    }
+    int index=acl_find(path);
+    if(index>=0) {
+        if(owner)*owner=acl_records[index].owner;
+        if(mode)*mode=acl_records[index].mode;
+        return;
+    }
+    if(owner)*owner=0;
+    if(mode)*mode=(uint16_t)(type==VFS_NODE_DIRECTORY?0755u:0644u);
+}
+static int acl_access(const char *path,enum vfs_node_type type,uint8_t required) {
+    uint32_t principal=acl_current_owner(),owner=0;
+    uint16_t mode=0;
+    if(principal==0) return 1;
+    acl_get(path,type,&owner,&mode);
+    uint8_t bits=(uint8_t)(principal==owner?((mode>>6)&7u):(mode&7u));
+    return (bits&required)==required;
+}
+static int acl_parent_access(const char *path,int need_write) {
+    uint8_t required=(uint8_t)(ACL_EXEC|(need_write?ACL_WRITE:0u));
+    if(!acl_access("",VFS_NODE_DIRECTORY,required)) return 0;
+    size_t n=str_len(path);
+    char parent[VFS_PATH_MAX+1u];
+    for(size_t i=0;i<n;i++) {
+        if(path[i]!='/') continue;
+        if(!i || i>VFS_PATH_MAX) return 0;
+        bytes_copy(parent,path,i);
+        parent[i]=0;
+        if(!acl_access(parent,VFS_NODE_DIRECTORY,required)) return 0;
+    }
+    return 1;
+}
+static int acl_owner_or_root(const char *path) {
+    uint32_t principal=acl_current_owner(),owner=0;
+    if(principal==0) return 1;
+    acl_get(path,VFS_NODE_FILE,&owner,0);
+    return owner==principal;
+}
+static int acl_set(const char *path,uint32_t owner,uint16_t mode,
+                   enum vfs_node_type type) {
+    if(!path || !*path || str_len(path)>VFS_PATH_MAX || owner>1u ||
+       (type!=VFS_NODE_FILE && type!=VFS_NODE_DIRECTORY)) return -1;
+    int slot=acl_find(path);
+    if(slot<0) {
+        for(uint32_t i=0;i<VFS_ACL_MAX;i++)
+            if(!acl_records[i].used) {slot=(int)i;break;}
+    }
+    if(slot<0) return -1;
+    struct vfs_acl_record *r=&acl_records[slot];
+    bytes_zero(r,sizeof(*r));
+    bytes_copy(r->path,path,str_len(path)+1u);
+    r->owner=owner;r->mode=(uint16_t)(mode&0777u);
+    r->type=(uint8_t)type;r->used=1;
+    return 0;
+}
+static void acl_remove(const char *path) {
+    int slot=acl_find(path);
+    if(slot>=0) bytes_zero(&acl_records[slot],sizeof(acl_records[slot]));
+}
+static int acl_rename(const char *source,const char *destination) {
+    int slot=acl_find(source);
+    if(slot<0) return 0;
+    if(acl_find(destination)>=0 || str_len(destination)>VFS_PATH_MAX) return -1;
+    bytes_zero(acl_records[slot].path,sizeof(acl_records[slot].path));
+    bytes_copy(acl_records[slot].path,destination,str_len(destination)+1u);
+    return 0;
+}
+static uint32_t acl_checksum(const struct vfs_acl_disk *disk) {
+    uint32_t hash=2166136261u;
+    const uint8_t *bytes=(const uint8_t *)disk->records;
+    for(size_t i=0;i<sizeof(disk->records);i++)
+        hash=(hash^bytes[i])*16777619u;
+    hash=(hash^disk->magic)*16777619u;
+    hash=(hash^disk->version)*16777619u;
+    hash=(hash^disk->count)*16777619u;
+    return hash;
+}
+static int acl_save(void) {
+    if(!pfs_ready()) return 0;
+    struct vfs_acl_disk disk;
+    bytes_zero(&disk,sizeof(disk));
+    disk.magic=VFS_ACL_MAGIC;disk.version=VFS_ACL_VERSION;
+    for(uint32_t i=0;i<VFS_ACL_MAX;i++) {
+        disk.records[i]=acl_records[i];
+        if(acl_records[i].used) ++disk.count;
+    }
+    disk.checksum=acl_checksum(&disk);
+    int result=pfs_write_binary(".vfsmeta",&disk,sizeof(disk));
+    return result==(int)sizeof(disk)?0:-1;
+}
+static void acl_init(void) {
+    bytes_zero(acl_records,sizeof(acl_records));
+    if(!pfs_ready()) return;
+    struct vfs_acl_disk disk;
+    bytes_zero(&disk,sizeof(disk));
+    int size=pfs_read_binary(".vfsmeta",&disk,sizeof(disk));
+    if(size!=(int)sizeof(disk) || disk.magic!=VFS_ACL_MAGIC ||
+       disk.version!=VFS_ACL_VERSION || disk.count>VFS_ACL_MAX ||
+       disk.checksum!=acl_checksum(&disk)) return;
+    uint32_t valid=0;
+    for(uint32_t i=0;i<VFS_ACL_MAX;i++) {
+        struct vfs_acl_record *r=&disk.records[i];
+        if(!r->used || r->owner>1u ||
+           (r->type!=VFS_NODE_FILE && r->type!=VFS_NODE_DIRECTORY)) continue;
+        char normalized[VFS_PATH_MAX+1u];
+        if(normalize_path(r->path,normalized)<0 || !str_eq(normalized,r->path) ||
+           acl_reserved_path(r->path)) continue;
+        acl_records[i]=*r;
+        ++valid;
+    }
+    (void)valid;
+}
+
 int vfs_mount(const char *mount_path,enum vfs_backend backend) {
     char normalized[VFS_PATH_MAX+1u];
     if (normalize_path(mount_path,normalized)<0 ||
@@ -140,6 +294,7 @@ void vfs_init(void) {
     (void)vfs_mount("/",pfs_ready()?VFS_BACKEND_BREADFS:VFS_BACKEND_RAM);
     (void)vfs_mount("/dev",VFS_BACKEND_DEV);
     (void)vfs_mount("/proc",VFS_BACKEND_PROC);
+    acl_init();
 }
 
 static size_t backend_count(enum vfs_backend backend) {
@@ -279,7 +434,7 @@ int vfs_open(const char *path,uint32_t flags) {
     if(slot<0) return -1;
     struct vfs_handle *h=&handles[owner][slot];
     h->backend=backend;h->flags=flags;h->owner=owner;
-    h->position=0;h->size=0;h->dirty=0;h->device=0;
+    h->position=0;h->size=0;h->dirty=0;h->device=0;h->created=0;
     bytes_copy(h->path,relative,str_len(relative)+1u);
     if(backend==VFS_BACKEND_DEV) {
         h->device=(uint8_t)device_id(relative);
@@ -298,10 +453,19 @@ int vfs_open(const char *path,uint32_t flags) {
         return slot;
     }
     if(str_len(relative)>FS_NAME_MAX)return -1;
+    if(acl_reserved_path(relative)) return -1;
     int is_directory=0;
     int exists=backend_exists(backend,relative,&is_directory);
-    if(!exists && (flags&VFS_O_CREATE) && !backend_parent_exists(backend,relative))return -1;
     if(is_directory) return -1;
+    if(exists) {
+        uint8_t required=(uint8_t)(((flags&VFS_O_READ)?ACL_READ:0u)|
+                                   ((flags&VFS_O_WRITE)?ACL_WRITE:0u));
+        if(!acl_parent_access(normalized,0) ||
+           !acl_access(normalized,VFS_NODE_FILE,required)) return -1;
+    } else if(flags&VFS_O_CREATE) {
+        if(!backend_parent_exists(backend,relative) ||
+           !acl_parent_access(normalized,1)) return -1;
+    } else return -1;
     if(flags&VFS_O_BINARY) {
         if(backend!=VFS_BACKEND_BREADFS) return -1;
         if(exists) {
@@ -316,7 +480,7 @@ int vfs_open(const char *path,uint32_t flags) {
         h->size=(uint32_t)size;
         bytes_copy(h->data,text,(size_t)size);
     } else if(!(flags&VFS_O_CREATE)) return -1;
-    if(!exists && (flags&VFS_O_CREATE)) h->dirty=1;
+    if(!exists && (flags&VFS_O_CREATE)) { h->dirty=1;h->created=1; }
     if(flags&VFS_O_TRUNCATE) { h->size=0; h->dirty=1; }
     h->used=1;
     return slot;
@@ -326,6 +490,7 @@ static void discard_handle(struct vfs_handle *h) {
     if(!h)return;
     h->used=0;
     h->dirty=0;
+    h->created=0;
     bytes_zero(h->data,sizeof(h->data));
 }
 static int finish_handle(struct vfs_handle *h) {
@@ -340,6 +505,12 @@ static int finish_handle(struct vfs_handle *h) {
                 h->data[h->size]=0;
                 result=backend_write_text(h->backend,h->path,(const char *)h->data);
             }
+        }
+        if(result>=0 && h->created) {
+            uint32_t principal=h->owner==0u?0u:1u;
+            uint16_t mode=(uint16_t)(principal==0u?0644u:0600u);
+            if(acl_set(h->path,principal,mode,VFS_NODE_FILE)<0 || acl_save()<0)
+                result=-1;
         }
     }
     discard_handle(h);
@@ -425,7 +596,13 @@ int vfs_stat_path(const char *path,struct vfs_stat *status) {
     if(!status) return -1;
     enum vfs_backend backend;const char *relative;char normalized[VFS_PATH_MAX+1u];
     if(resolve_path(path,&backend,&relative,normalized)<0) return -1;
-    if(!*relative) { status->type=VFS_NODE_DIRECTORY;status->size=0;return 0; }
+    if(backend!=VFS_BACKEND_DEV && backend!=VFS_BACKEND_PROC &&
+       acl_reserved_path(relative)) return -1;
+    if(!*relative) {
+        if(backend!=VFS_BACKEND_DEV && backend!=VFS_BACKEND_PROC &&
+           !acl_access("",VFS_NODE_DIRECTORY,ACL_READ|ACL_EXEC)) return -1;
+        status->type=VFS_NODE_DIRECTORY;status->size=0;return 0;
+    }
     if(backend==VFS_BACKEND_DEV) {
         if(!device_id(relative))return -1;
         status->type=VFS_NODE_DEVICE;status->size=0;return 0;
@@ -434,9 +611,13 @@ int vfs_stat_path(const char *path,struct vfs_stat *status) {
         if(!proc_name(relative))return -1;
         status->type=VFS_NODE_FILE;status->size=0;return 0;
     }
+    if(!acl_parent_access(normalized,0)) return -1;
     int is_directory=0;
     if(!backend_exists(backend,relative,&is_directory))return -1;
-    status->type=is_directory?VFS_NODE_DIRECTORY:VFS_NODE_FILE;
+    enum vfs_node_type type=is_directory?VFS_NODE_DIRECTORY:VFS_NODE_FILE;
+    uint8_t required=is_directory?(ACL_READ|ACL_EXEC):ACL_READ;
+    if(!acl_access(normalized,type,required)) return -1;
+    status->type=type;
     status->size=0;
     return 0;
 }
@@ -480,7 +661,7 @@ int vfs_readdir(const char *path,size_t index,struct vfs_dirent *entry) {
         prefix[prefix_length]=0;
         for(size_t i=0;i<backend_count(backend);i++) {
             const char *stored=backend_name(backend,i);
-            if(!stored || !str_starts(stored,prefix)) continue;
+            if(!stored || acl_reserved_path(stored) || !str_starts(stored,prefix)) continue;
             const char *rest=stored+prefix_length;
             if(!*rest) continue;
             size_t child_length=0;
@@ -490,6 +671,18 @@ int vfs_readdir(const char *path,size_t index,struct vfs_dirent *entry) {
             bytes_copy(child,rest,child_length);child[child_length]=0;
             enum vfs_node_type type=rest[child_length]=='/'?
                 VFS_NODE_DIRECTORY:VFS_NODE_FILE;
+            char full[VFS_PATH_MAX+1u];
+            size_t parent_length=str_len(normalized);
+            if(parent_length) {
+                bytes_copy(full,normalized,parent_length);
+                full[parent_length++]='/';
+            }
+            if(parent_length+child_length>VFS_PATH_MAX) continue;
+            bytes_copy(full+parent_length,child,child_length);
+            full[parent_length+child_length]=0;
+            uint8_t required=type==VFS_NODE_DIRECTORY?
+                (ACL_READ|ACL_EXEC):ACL_READ;
+            if(!acl_parent_access(full,0) || !acl_access(full,type,required)) continue;
             add_dirent(entries,&count,child,type);
         }
     }
@@ -508,25 +701,50 @@ static int resolve_backend_mutation(const char *path,enum vfs_backend *backend,
 }
 int vfs_mkdir(const char *path) {
     enum vfs_backend b;const char *r;char n[VFS_PATH_MAX+1u];
-    if(resolve_backend_mutation(path,&b,&r,n)<0) return -1;
-    return b==VFS_BACKEND_BREADFS?pfs_mkdir(r):fs_mkdir(r);
+    if(resolve_backend_mutation(path,&b,&r,n)<0 || acl_reserved_path(r) ||
+       !acl_parent_access(n,1)) return -1;
+    int result=b==VFS_BACKEND_BREADFS?pfs_mkdir(r):fs_mkdir(r);
+    if(result<0) return result;
+    uint32_t owner=acl_current_owner();
+    uint16_t mode=(uint16_t)(owner==0u?0755u:0700u);
+    if(acl_set(n,owner,mode,VFS_NODE_DIRECTORY)<0 || acl_save()<0) {
+        if(b==VFS_BACKEND_BREADFS)(void)pfs_rmdir(r);else (void)fs_rmdir(r);
+        acl_remove(n);
+        return -1;
+    }
+    return 0;
 }
 int vfs_unlink(const char *path) {
     enum vfs_backend b;const char *r;char n[VFS_PATH_MAX+1u];
-    if(resolve_backend_mutation(path,&b,&r,n)<0) return -1;
-    return b==VFS_BACKEND_BREADFS?pfs_remove(r):fs_remove(r);
+    if(resolve_backend_mutation(path,&b,&r,n)<0 || acl_reserved_path(r) ||
+       !acl_parent_access(n,1) || !acl_owner_or_root(n)) return -1;
+    int result=b==VFS_BACKEND_BREADFS?pfs_remove(r):fs_remove(r);
+    if(result<0) return result;
+    acl_remove(n);(void)acl_save();
+    return 0;
 }
 int vfs_rmdir(const char *path) {
     enum vfs_backend b;const char *r;char n[VFS_PATH_MAX+1u];
-    if(resolve_backend_mutation(path,&b,&r,n)<0) return -1;
-    return b==VFS_BACKEND_BREADFS?pfs_rmdir(r):fs_rmdir(r);
+    if(resolve_backend_mutation(path,&b,&r,n)<0 || acl_reserved_path(r) ||
+       !acl_parent_access(n,1) || !acl_owner_or_root(n)) return -1;
+    int result=b==VFS_BACKEND_BREADFS?pfs_rmdir(r):fs_rmdir(r);
+    if(result<0) return result;
+    acl_remove(n);(void)acl_save();
+    return 0;
 }
 int vfs_rename(const char *source,const char *destination) {
     enum vfs_backend sb,db;const char *sr,*dr;
     char sn[VFS_PATH_MAX+1u],dn[VFS_PATH_MAX+1u];
     if(resolve_backend_mutation(source,&sb,&sr,sn)<0 ||
-       resolve_backend_mutation(destination,&db,&dr,dn)<0 || sb!=db) return -1;
-    return sb==VFS_BACKEND_BREADFS?pfs_move(sr,dr):fs_move(sr,dr);
+       resolve_backend_mutation(destination,&db,&dr,dn)<0 || sb!=db ||
+       acl_reserved_path(sr) || acl_reserved_path(dr) ||
+       !acl_owner_or_root(sn) || !acl_parent_access(sn,1) ||
+       !acl_parent_access(dn,1)) return -1;
+    int result=sb==VFS_BACKEND_BREADFS?pfs_move(sr,dr):fs_move(sr,dr);
+    if(result<0) return result;
+    if(acl_rename(sn,dn)<0) return -1;
+    (void)acl_save();
+    return 0;
 }
 
 int vfs_read_all(const char *path,void *buffer,size_t capacity,int binary) {
