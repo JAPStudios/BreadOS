@@ -140,7 +140,7 @@ struct vfs_acl_disk {
 static struct vfs_acl_record acl_records[VFS_ACL_MAX];
 
 static uint32_t acl_current_owner(void) {
-    return task_current_id()==0u?0u:1u;
+    return task_current_id()<TASK_KERNEL_COUNT?0u:1u;
 }
 static int acl_reserved_path(const char *path) {
     return str_eq(path,".vfsmeta");
@@ -507,7 +507,7 @@ static int finish_handle(struct vfs_handle *h) {
             }
         }
         if(result>=0 && h->created) {
-            uint32_t principal=h->owner==0u?0u:1u;
+            uint32_t principal=h->owner<TASK_KERNEL_COUNT?0u:1u;
             uint16_t mode=(uint16_t)(principal==0u?0644u:0600u);
             if(acl_set(h->path,principal,mode,VFS_NODE_FILE)<0 || acl_save()<0)
                 result=-1;
