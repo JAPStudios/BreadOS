@@ -2,12 +2,12 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define GDT_ENTRIES 6u
+#define GDT_ENTRIES 10u
 #define KERNEL_CODE_SELECTOR 0x08u
 #define KERNEL_DATA_SELECTOR 0x10u
-#define USER_CODE_SELECTOR   0x1Bu
 #define USER_DATA_SELECTOR   0x23u
-#define TSS_SELECTOR         0x28u
+#define USER_TASK_FIRST      3u
+#define USER_TASK_END        8u
 
 struct gdt_entry {
     uint16_t limit_low;
@@ -60,12 +60,29 @@ void gdt_set_kernel_stack(uint32_t stack_pointer) {
     tss.esp0 = stack_pointer;
 }
 
+/*
+ * Give each ring-3 task a distinct GDT code descriptor. Slot 3 keeps the
+ * original selector 0x1B; slot 4 is reserved for the shared user data segment.
+ */
+static unsigned user_code_index(uint32_t task_id) {
+    if (task_id<USER_TASK_FIRST || task_id>=USER_TASK_END) return 0;
+    return task_id==USER_TASK_FIRST ? 3u : task_id+1u;
+}
+
+uint16_t gdt_user_code_selector(uint32_t task_id) {
+    unsigned index=user_code_index(task_id);
+    return index ? (uint16_t)((index<<3)|3u) : 0;
+}
+
 /* The i386 user CS limit is rounded to 4 KiB pages by the G bit. */
-void gdt_set_user_code_limit(uint32_t inclusive_limit) {
+void gdt_set_user_code_limit(uint32_t task_id,uint32_t inclusive_limit) {
+    unsigned index=user_code_index(task_id);
+    if (!index || inclusive_limit<0x40000000u ||
+        inclusive_limit>0x403FFFFFu) return;
     uint32_t encoded=inclusive_limit>>12;
-    gdt[3].limit_low=(uint16_t)(encoded&0xFFFFu);
-    gdt[3].granularity=(uint8_t)((gdt[3].granularity&0xF0u)|
-                                  ((encoded>>16)&0x0Fu));
+    gdt[index].limit_low=(uint16_t)(encoded&0xFFFFu);
+    gdt[index].granularity=(uint8_t)((gdt[index].granularity&0xF0u)|
+                                      ((encoded>>16)&0x0Fu));
 }
 
 void gdt_init(void) {
@@ -73,18 +90,21 @@ void gdt_init(void) {
         set_entry(i, 0, 0, 0, 0);
     }
 
-    /* Flat 4 GiB segments. DPL=0 for kernel; DPL=3 for user segments. */
+    /* Kernel code/data, one user data segment, and one code segment per user task. */
     set_entry(1, 0, 0xFFFFFu, 0x9Au, 0xC0u);
     set_entry(2, 0, 0xFFFFFu, 0x92u, 0xC0u);
-    set_entry(3, 0, 0xFFFFFu, 0xFAu, 0xC0u);
     set_entry(4, 0, 0xFFFFFu, 0xF2u, 0xC0u);
+    for (uint32_t task_id=USER_TASK_FIRST;task_id<USER_TASK_END;task_id++) {
+        unsigned index=user_code_index(task_id);
+        set_entry(index,0,0xFFFFFu,0xFAu,0xC0u);
+    }
 
     for (size_t i = 0; i < sizeof(tss); ++i) {
         ((uint8_t *)&tss)[i] = 0;
     }
     tss.ss0 = KERNEL_DATA_SELECTOR;
     tss.iomap_base = (uint16_t)sizeof(tss);
-    set_entry(5, (uint32_t)(uintptr_t)&tss,
+    set_entry(9, (uint32_t)(uintptr_t)&tss,
               (uint32_t)sizeof(tss) - 1u, 0x89u, 0x00u);
 
     const struct gdt_pointer pointer = {

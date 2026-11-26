@@ -7,9 +7,17 @@ void ipc_remove_sender(uint32_t task_id) { (void)task_id; }
 static uint32_t active_directory;
 static uint32_t kernel_switches;
 static uint32_t active_kernel_stack;
-static uint32_t active_user_code_limit;
+static uint32_t user_code_limits[TASK_MAX];
+uint16_t gdt_user_code_selector(uint32_t task_id) {
+    if (task_id<TASK_KERNEL_COUNT || task_id>=TASK_MAX) return 0;
+    uint32_t index=task_id==TASK_KERNEL_COUNT?3u:task_id+1u;
+    return (uint16_t)((index<<3)|3u);
+}
 void gdt_set_kernel_stack(uint32_t stack_top) { active_kernel_stack = stack_top; }
-void gdt_set_user_code_limit(uint32_t limit) { active_user_code_limit = limit; }
+void gdt_set_user_code_limit(uint32_t task_id,uint32_t limit) {
+    assert(task_id<TASK_MAX);
+    user_code_limits[task_id]=limit;
+}
 int paging_switch_address_space(const struct paging_address_space *space) {
     if (!space || !space->directory_physical || !space->user_table_physical) return -1;
     active_directory = space->directory_physical;
@@ -25,6 +33,11 @@ int main(void) {
     uint32_t worker_a_frame[16] = {0};
     uint32_t worker_b_frame[16] = {0};
     uint32_t user_frame[16] = {0};
+
+    assert(gdt_user_code_selector(2u)==0u);
+    assert(gdt_user_code_selector(3u)==0x1Bu);
+    assert(gdt_user_code_selector(4u)==0x2Bu);
+    assert(gdt_user_code_selector(7u)==0x43u);
 
     tasking_init();
     assert(task_switch_count() == 0);
@@ -73,7 +86,8 @@ int main(void) {
     assert(task_current_id() == (uint32_t)id);
     assert(active_directory == user_space.directory_physical);
     assert(active_kernel_stack == 0x5000u);
-    assert(active_user_code_limit == 0x40001FFFu);
+    assert(user_code_limits[id] == 0x40001FFFu);
+    assert(user_frame[11] == gdt_user_code_selector((uint32_t)id));
 
     assert(task_terminate_current(9) == 0);
     assert(task_is_zombie((uint32_t)id));
@@ -89,7 +103,8 @@ int main(void) {
     assert(task_schedule(shell_frame) == worker_a_frame);
     assert(task_schedule(worker_a_frame) == worker_b_frame);
     assert(task_schedule(worker_b_frame) == user_frame);
-    assert(active_user_code_limit == 0x40002FFFu);
+    assert(user_code_limits[reused] == 0x40002FFFu);
+    assert(user_frame[11] == gdt_user_code_selector((uint32_t)reused));
     assert(task_terminate_current(-11) == 0);
     assert(task_schedule(user_frame) == shell_frame);
     assert(task_exit_code((uint32_t)reused) == -11);

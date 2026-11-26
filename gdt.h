@@ -8,7 +8,10 @@ void gdt_init(void);
 /* Kernel stack top used by the CPU when entering from ring 3. */
 void gdt_set_kernel_stack(uint32_t stack_pointer);
 
-/* Restrict ring-3 instruction fetches to the executable ELF address range. */
-void gdt_set_user_code_limit(uint32_t inclusive_limit);
+/* Return the private ring-3 code selector assigned to a user task slot. */
+uint16_t gdt_user_code_selector(uint32_t task_id);
+
+/* Configure that task's private code descriptor to its executable ELF range. */
+void gdt_set_user_code_limit(uint32_t task_id,uint32_t inclusive_limit);
 
 #endif

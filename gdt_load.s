@@ -13,7 +13,7 @@ gdt_load:
     movw %ax, %ss
     movw %ax, %fs
     movw %ax, %gs
-    movw $0x28, %ax
+    movw $0x48, %ax
     ltr %ax
     ret
 .section .note.GNU-stack,"",@progbits
