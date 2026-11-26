@@ -9,7 +9,7 @@
 #include "kernel/keyboard.h"
 #include <stdint.h>
 
-#define VFS_MOUNT_MAX 4u
+#define VFS_MOUNT_MAX 8u
 #define VFS_NAME_MAX FS_NAME_MAX
 
 struct vfs_mount_entry {
@@ -22,7 +22,7 @@ struct vfs_handle {
     uint8_t used;
     uint8_t dirty;
     uint8_t device;
-    uint8_t reserved;
+    uint8_t mount_index;
     uint32_t flags;
     uint32_t owner;
     enum vfs_backend backend;
@@ -115,6 +115,19 @@ static int resolve_path(const char *input,enum vfs_backend *backend,
     return 0;
 }
 
+static int backend_exists(enum vfs_backend backend,const char *path,int *is_directory);
+
+static int mount_index_for_path(const char *normalized) {
+    int best=-1;
+    size_t best_length=0;
+    for(uint32_t i=0;i<VFS_MOUNT_MAX;i++) {
+        if(!mounts[i].used || !mount_prefix(normalized,mounts[i].path)) continue;
+        size_t n=str_len(mounts[i].path);
+        if(best<0 || n>best_length) { best=(int)i;best_length=n; }
+    }
+    return best;
+}
+
 
 static int user_task(void) {
     return task_current_id()>=TASK_KERNEL_COUNT;
@@ -125,20 +138,63 @@ static int user_writable_path(const char *normalized) {
 
 int vfs_mount(const char *mount_path,enum vfs_backend backend) {
     char normalized[VFS_PATH_MAX+1u];
-    if (normalize_path(mount_path,normalized)<0 ||
-        backend<VFS_BACKEND_RAM || backend>VFS_BACKEND_PROC)
-        return -1;
-    for (uint32_t i=0;i<VFS_MOUNT_MAX;i++) {
-        if (mounts[i].used && str_eq(mounts[i].path,normalized)) return -1;
+    if(!mount_path || mount_path[0]!='/' || normalize_path(mount_path,normalized)<0 ||
+       backend<VFS_BACKEND_RAM || backend>VFS_BACKEND_PROC) return -1;
+    for(uint32_t i=0;i<VFS_MOUNT_MAX;i++)
+        if(mounts[i].used && str_eq(mounts[i].path,normalized)) return -1;
+
+    if(!*normalized) {
+        if(backend!=VFS_BACKEND_RAM && backend!=VFS_BACKEND_BREADFS) return -1;
+        if(backend==VFS_BACKEND_BREADFS && !pfs_ready()) return -1;
+    } else if(str_eq(normalized,"dev")) {
+        if(backend!=VFS_BACKEND_DEV) return -1;
+    } else if(str_eq(normalized,"proc")) {
+        if(backend!=VFS_BACKEND_PROC) return -1;
+    } else {
+        if(backend!=VFS_BACKEND_RAM && backend!=VFS_BACKEND_BREADFS) return -1;
+        if(backend==VFS_BACKEND_BREADFS && !pfs_ready()) return -1;
+        enum vfs_backend parent_backend;
+        const char *parent_relative;
+        char parent_normalized[VFS_PATH_MAX+1u];
+        int is_directory=0;
+        if(resolve_path(mount_path,&parent_backend,&parent_relative,parent_normalized)<0 ||
+           !*parent_relative || !backend_exists(parent_backend,parent_relative,&is_directory) ||
+           !is_directory) return -1;
     }
-    for (uint32_t i=0;i<VFS_MOUNT_MAX;i++) {
-        if (mounts[i].used) continue;
+
+    for(uint32_t i=0;i<VFS_MOUNT_MAX;i++) {
+        if(mounts[i].used) continue;
         mounts[i].backend=backend;
         bytes_copy(mounts[i].path,normalized,str_len(normalized)+1u);
         mounts[i].used=1;
         return 0;
     }
     return -1;
+}
+
+int vfs_unmount(const char *mount_path) {
+    char normalized[VFS_PATH_MAX+1u];
+    if(!mount_path || mount_path[0]!='/' || normalize_path(mount_path,normalized)<0 ||
+       !*normalized || str_eq(normalized,"dev") || str_eq(normalized,"proc")) return -1;
+    int slot=-1;
+    for(uint32_t i=0;i<VFS_MOUNT_MAX;i++)
+        if(mounts[i].used && str_eq(mounts[i].path,normalized)) {slot=(int)i;break;}
+    if(slot<0) return -1;
+
+    size_t n=str_len(normalized);
+    for(uint32_t i=0;i<VFS_MOUNT_MAX;i++) {
+        if((int)i==slot || !mounts[i].used) continue;
+        if(str_starts(mounts[i].path,normalized) && mounts[i].path[n]=='/')
+            return -1;
+    }
+    for(uint32_t task=0;task<TASK_MAX;task++)
+        for(uint32_t i=0;i<VFS_OPEN_MAX;i++)
+            if(handles[task][i].used && handles[task][i].mount_index==(uint8_t)slot)
+                return -1;
+
+    mounts[slot].used=0;
+    bytes_zero(mounts[slot].path,sizeof(mounts[slot].path));
+    return 0;
 }
 
 void vfs_init(void) {
@@ -288,7 +344,9 @@ int vfs_open(const char *path,uint32_t flags) {
         if(!handles[owner][i].used){slot=(int)i;break;}
     if(slot<0) return -1;
     struct vfs_handle *h=&handles[owner][slot];
-    h->backend=backend;h->flags=flags;h->owner=owner;
+    int mount_index=mount_index_for_path(normalized);
+    if(mount_index<0) return -1;
+    h->backend=backend;h->flags=flags;h->owner=owner;h->mount_index=(uint8_t)mount_index;
     h->position=0;h->size=0;h->dirty=0;h->device=0;
     bytes_copy(h->path,relative,str_len(relative)+1u);
     if(backend==VFS_BACKEND_DEV) {
@@ -341,6 +399,7 @@ static void discard_handle(struct vfs_handle *h) {
     if(!h)return;
     h->used=0;
     h->dirty=0;
+    h->mount_index=0;
     bytes_zero(h->data,sizeof(h->data));
 }
 static int finish_handle(struct vfs_handle *h) {
