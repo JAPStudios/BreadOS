@@ -529,9 +529,6 @@ int vfs_mkdir(const char *path) {
        (user_task() && !user_writable_path(n))) return -1;
     int result=b==VFS_BACKEND_BREADFS?pfs_mkdir(r):fs_mkdir(r);
     if(result<0) return result;
-    uint32_t owner=acl_current_owner();
-    uint16_t mode=(uint16_t)(owner==0u?0755u:0700u);
-    (void)owner;(void)mode;
     return 0;
 }
 int vfs_unlink(const char *path) {
