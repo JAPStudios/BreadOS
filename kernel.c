@@ -256,7 +256,9 @@ void kernel_main(uint32_t magic,uint32_t mbi){
     puts("GDT installed; TSS loaded for future ring-3 execution.\n");
     memory_init(mbi);puts("Physical frame allocator initialized.\n");
     heap_init();if(heap_check_integrity())puts("Hardened kernel heap initialized (256 KiB; integrity verified).\n");else{puts("ERROR: kernel heap integrity check failed at initialization.\n");for(;;)__asm__ volatile("cli; hlt");}
-    paging_init();puts("Paging enabled: first 256 MiB identity-mapped.\n");
+    paging_init();
+    if (paging_nx_supported()) puts("PAE paging enabled; NX user-page enforcement active.\n");
+    else puts("PAE/NX unavailable; user-mode execution disabled.\n");
     pci_init();puts("PCI configuration-space scan complete.\\n");
     if(video_init(mbi)==0){theme_apply(theme_current()->name);puts("GRUB RGB framebuffer mapped; native graphical text console initialized.\n");}else puts("No supported GRUB RGB framebuffer; VGA text fallback active.\n");
     int storage=pfs_init();if(storage==2)puts("Persistent BreadFS formatted and mounted.\n");else if(storage==1)puts("Persistent BreadFS mounted.\n");else{fs_init();if(storage==0)puts("RAM filesystem initialized (no usable ATA volume).\n");else puts("RAM filesystem initialized (ATA volume not recognized; disk left unchanged).\n");}
