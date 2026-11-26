@@ -190,6 +190,9 @@ int vfs_mount(const char *mount_path,enum vfs_backend backend) {
             goto mount_done;
     }
     if(parent_index>=0) {
+        int still_directory=0;
+        if(!backend_exists(parent_backend,parent_relative,&still_directory) ||
+           !still_directory) goto mount_done;
         for(uint32_t task=0;task<TASK_MAX;task++)
             for(uint32_t h=0;h<VFS_OPEN_MAX;h++)
                 if(handles[task][h].used &&
