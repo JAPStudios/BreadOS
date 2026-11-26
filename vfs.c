@@ -33,6 +33,7 @@ struct vfs_handle {
 };
 
 static struct vfs_mount_entry mounts[VFS_MOUNT_MAX];
+static volatile uint32_t mount_generation;
 static struct vfs_handle handles[TASK_MAX][VFS_OPEN_MAX];
 
 static size_t str_len(const char *s) {
@@ -173,6 +174,7 @@ int vfs_mount(const char *mount_path,enum vfs_backend backend) {
         mounts[i].backend=backend;
         bytes_copy(mounts[i].path,normalized,str_len(normalized)+1u);
         mounts[i].used=1;
+        ++mount_generation;
         return 0;
     }
     return -1;
@@ -200,11 +202,13 @@ int vfs_unmount(const char *mount_path) {
 
     mounts[slot].used=0;
     bytes_zero(mounts[slot].path,sizeof(mounts[slot].path));
+    ++mount_generation;
     return 0;
 }
 
 void vfs_init(void) {
     for (uint32_t i=0;i<VFS_MOUNT_MAX;i++) mounts[i].used=0;
+    ++mount_generation;
     for (uint32_t task=0;task<TASK_MAX;task++)
         for (uint32_t i=0;i<VFS_OPEN_MAX;i++) handles[task][i].used=0;
     (void)vfs_mount("/",pfs_ready()?VFS_BACKEND_BREADFS:VFS_BACKEND_RAM);
@@ -334,7 +338,9 @@ static struct vfs_handle *handle_at(int handle) {
     return &handles[owner][handle];
 }
 
+static void discard_handle(struct vfs_handle *h);
 int vfs_open(const char *path,uint32_t flags) {
+    uint32_t generation=mount_generation;
     if (!(flags&(VFS_O_READ|VFS_O_WRITE)) ||
         ((flags&VFS_O_CREATE) && !(flags&VFS_O_WRITE)) ||
         (flags&~(VFS_O_READ|VFS_O_WRITE|VFS_O_CREATE|VFS_O_TRUNCATE|VFS_O_BINARY)) ||
@@ -363,12 +369,14 @@ int vfs_open(const char *path,uint32_t flags) {
         if((h->device==5u || h->device==6u) && (flags&VFS_O_WRITE)) return -1;
         if((flags&VFS_O_BINARY) || (flags&VFS_O_TRUNCATE)) return -1;
         h->used=1;
+        if(generation!=mount_generation){discard_handle(h);return -1;}
         return slot;
     }
     if(backend==VFS_BACKEND_PROC) {
         if(!(flags&VFS_O_READ) || (flags&(VFS_O_WRITE|VFS_O_CREATE|VFS_O_TRUNCATE|VFS_O_BINARY)) ||
            !proc_name(relative) || build_pseudo_file(h,relative)<0) return -1;
         h->used=1;
+        if(generation!=mount_generation){discard_handle(h);return -1;}
         return slot;
     }
     if(str_len(relative)>FS_NAME_MAX)return -1;
@@ -398,6 +406,7 @@ int vfs_open(const char *path,uint32_t flags) {
     if(!exists && (flags&VFS_O_CREATE)) h->dirty=1;
     if(flags&VFS_O_TRUNCATE) { h->size=0; h->dirty=1; }
     h->used=1;
+    if(generation!=mount_generation){discard_handle(h);return -1;}
     return slot;
 }
 
