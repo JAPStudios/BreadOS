@@ -155,7 +155,7 @@ grep -F "BreadOS isolation test: attempting protected supervisor-memory write." 
 grep -F "Commands: help, menu" build/qemu-serial.log
 grep -F "PASS: another user process could not modify victim memory." build/qemu-serial.log
 grep -F "W^X task id: 4" build/qemu-serial.log
-grep -F "PASS: W^X task loaded its private code selector." build/qemu-serial.log
+grep -F "PASS: W^X task loaded its private LDT code selector." build/qemu-serial.log
 grep -F "PASS: user CS limit excludes writable data." build/qemu-serial.log
 grep -F "W^X test: attempting to execute writable data." build/qemu-serial.log
 grep -F "Commands: help, menu" build/qemu-serial.log
