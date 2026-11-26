@@ -7,8 +7,6 @@
 
 #define TASK_STACK_SIZE 4096u
 #define KERNEL_CODE_SELECTOR 0x08u
-#define USER_CODE_MIN 0x40000000u
-#define USER_CODE_MAX 0x403FFFFFu
 #define INITIAL_EFLAGS 0x202u
 
 struct task {
@@ -69,7 +67,9 @@ void tasking_init(void) {
         tasks[i].saved_stack = 0;
         tasks[i].state = TASK_UNUSED;
         tasks[i].address_space.directory_physical = 0;
-        tasks[i].address_space.user_table_physical = 0;
+        tasks[i].address_space.user_directory_physical = 0;
+        tasks[i].address_space.user_table_physical[0] = 0;
+        tasks[i].address_space.user_table_physical[1] = 0;
         tasks[i].kernel_stack_top = 0;
         tasks[i].exit_code = 0;
     }
@@ -98,30 +98,29 @@ int task_set_kernel_stack(uint32_t stack_top) {
 
 int task_set_address_space(const struct paging_address_space *space) {
     if (tasks[current_task].state != TASK_RUNNABLE) return -1;
-    if (space && (!space->directory_physical || !space->user_table_physical))
+    if (space && (!space->directory_physical || !space->user_directory_physical ||
+                 !space->user_table_physical[0] || !space->user_table_physical[1]))
         return -1;
     if (space) {
         tasks[current_task].address_space = *space;
     } else {
         tasks[current_task].address_space.directory_physical = 0;
-        tasks[current_task].address_space.user_table_physical = 0;
+        tasks[current_task].address_space.user_directory_physical = 0;
+        tasks[current_task].address_space.user_table_physical[0] = 0;
+        tasks[current_task].address_space.user_table_physical[1] = 0;
     }
     return 0;
 }
 
 int task_create_user(uint32_t *initial_frame,
                      const struct paging_address_space *space,
-                     uint32_t kernel_stack_top,
-                     uint32_t user_code_limit) {
+                     uint32_t kernel_stack_top) {
     if (!initial_frame || !space || !space->directory_physical ||
-        !space->user_table_physical || !kernel_stack_top ||
-        user_code_limit<USER_CODE_MIN || user_code_limit>USER_CODE_MAX)
+        !space->user_directory_physical || !space->user_table_physical[0] ||
+        !space->user_table_physical[1] || !kernel_stack_top)
         return -1;
     for (uint32_t i = TASK_KERNEL_COUNT; i < TASK_MAX; ++i) {
         if (tasks[i].state != TASK_UNUSED) continue;
-        uint16_t code_selector=gdt_prepare_user_code(i,user_code_limit);
-        if (!code_selector) return -1;
-        initial_frame[11]=(uint32_t)code_selector;
         tasks[i].saved_stack = initial_frame;
         tasks[i].address_space = *space;
         tasks[i].kernel_stack_top = kernel_stack_top;
@@ -172,9 +171,10 @@ int task_destroy(uint32_t task_id) {
         return -1;
     tasks[task_id].saved_stack = 0;
     tasks[task_id].address_space.directory_physical = 0;
-    tasks[task_id].address_space.user_table_physical = 0;
+    tasks[task_id].address_space.user_directory_physical = 0;
+    tasks[task_id].address_space.user_table_physical[0] = 0;
+    tasks[task_id].address_space.user_table_physical[1] = 0;
     tasks[task_id].kernel_stack_top = 0;
-    gdt_release_user_code(task_id);
     tasks[task_id].exit_code = 0;
     ipc_remove_sender(task_id);
     ipc_reset_task(task_id);
@@ -208,7 +208,6 @@ uint32_t *task_schedule(uint32_t *frame) {
         } else {
             paging_switch_kernel_address_space();
         }
-        gdt_load_task_ldt(candidate);
         next = candidate;
         break;
     }
@@ -217,7 +216,6 @@ uint32_t *task_schedule(uint32_t *frame) {
     if (next == TASK_MAX) {
         next = 0;
         paging_switch_kernel_address_space();
-        gdt_load_task_ldt(0);
     }
 
     if (next != current_task) {
