@@ -103,7 +103,7 @@ if not wait_for_text("Commands: help, menu",offset=offset):
     fail("Kernel shell did not remain responsive after the process-isolation test")
 time.sleep(0.2)
 
-# Keep task 3 alive so the W^X process must use its distinct task-4 code selector.
+# Keep task 3 alive while the W^X process exercises its separate user address space.
 offset=log_offset()
 send_text("exec victim\n")
 if not wait_for_text("victim task id: 3",offset=offset):
@@ -149,7 +149,7 @@ if [ "$status" -ne 124 ]; then
 fi
 grep -F "BreadOS kernel starting..." build/qemu-serial.log
 grep -F "Boot OK. VGA console and PS/2 keyboard shell ready." build/qemu-serial.log
-grep -F "Paging enabled: first 256 MiB identity-mapped." build/qemu-serial.log
+grep -F "PAE paging enabled; NX user-page enforcement active." build/qemu-serial.log
 grep -F "Persistent BreadFS mounted." build/qemu-serial.log
 grep -F "bread>" build/qemu-serial.log
 grep -F "BreadOS native user-mode application." build/qemu-serial.log
