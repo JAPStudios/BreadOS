@@ -20,8 +20,7 @@ int task_set_address_space(const struct paging_address_space *space);
 /* Register a ring-3 task with its initial interrupt frame and private resources. */
 int task_create_user(uint32_t *initial_frame,
                      const struct paging_address_space *space,
-                     uint32_t kernel_stack_top,
-                     uint32_t user_code_limit);
+                     uint32_t kernel_stack_top);
 
 /* Mark the current user task for deferred cleanup after another address space is active. */
 int task_terminate_current(int exit_code);
