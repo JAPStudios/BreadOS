@@ -196,13 +196,21 @@ int main(void) {
     assert(vfs_unmount("/mnt")<0);
     assert(vfs_close(fd)==0);
     assert(vfs_mkdir("/mnt/child")==0);
+    assert(vfs_write_all("/mnt/child/busy.txt","busy",4,0)==4);
+    int busyfd=vfs_open("/mnt/child/busy.txt",VFS_O_READ);
+    assert(busyfd>=0);
+    assert(vfs_mount("/mnt/child",VFS_BACKEND_RAM)<0);
+    assert(vfs_close(busyfd)==0);
     assert(vfs_mount("/mnt/child",VFS_BACKEND_RAM)==0);
     assert(vfs_unmount("/mnt")<0);
     assert(vfs_unmount("/mnt/child")==0);
     assert(vfs_unmount("/mnt")==0);
     assert(vfs_read_all("/m.txt",buffer,sizeof(buffer),0)==4);
     assert(strcmp(buffer,"data")==0);
+    assert(vfs_read_all("/child/busy.txt",buffer,sizeof(buffer),0)==4);
+    assert(strcmp(buffer,"busy")==0);
     assert(vfs_unlink("/m.txt")==0);
+    assert(vfs_unlink("/child/busy.txt")==0);
     assert(vfs_rmdir("/child")==0);
     assert(vfs_rmdir("/mnt")==0);
 
