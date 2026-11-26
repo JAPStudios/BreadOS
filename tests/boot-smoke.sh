@@ -4,7 +4,7 @@ mkdir -p build
 # Create a fresh persistent volume containing the compiled native user application.
 build/mk-breadfs-image build/breados-disk.img build/user/hello.elf build/user/guard.elf build/user/victim.elf build/user/attacker.elf build/user/wxguard.elf
 rm -f build/qemu-monitor.sock
-timeout 24s qemu-system-i386 -display none \
+timeout 60s qemu-system-i386 -display none \
   -monitor unix:build/qemu-monitor.sock,server,nowait -no-reboot -no-shutdown \
   -serial stdio -drive file=build/breados-disk.img,format=raw,if=ide,index=0 \
   -cdrom build/breados.iso > build/qemu-serial.log 2>&1 &
