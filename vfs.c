@@ -311,7 +311,8 @@ int vfs_open(const char *path,uint32_t flags) {
     int is_directory=0;
     int exists=backend_exists(backend,relative,&is_directory);
     if(is_directory) return -1;
-    if(user_task() && (flags&VFS_O_WRITE) && !user_writable_path(normalized))
+    if(user_task() && (flags&(VFS_O_WRITE|VFS_O_CREATE|VFS_O_TRUNCATE)) &&
+       !user_writable_path(normalized))
         return -1;
     if(!exists && (flags&VFS_O_CREATE) && !backend_parent_exists(backend,relative))
         return -1;
