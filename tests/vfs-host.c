@@ -185,6 +185,9 @@ int main(void) {
     assert(vfs_unmount("/")<0);
     assert(vfs_unmount("/dev")<0);
     assert(vfs_unmount("/proc")<0);
+    assert(vfs_unmount("/missing")<0);
+    assert(vfs_mount("/missing",VFS_BACKEND_RAM)<0);
+    assert(vfs_mount("/root-owned.txt",VFS_BACKEND_RAM)<0);
     assert(vfs_mkdir("/mnt")==0);
     assert(vfs_mount("/mnt",VFS_BACKEND_RAM)==0);
     fd=vfs_open("/mnt/m.txt",VFS_O_WRITE|VFS_O_CREATE|VFS_O_TRUNCATE);
