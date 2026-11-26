@@ -163,7 +163,7 @@ int main(void) {
     assert(vfs_unlink("/root-owned.txt")<0);
     assert(vfs_rename("/root-owned.txt","/renamed.txt")<0);
 
-    /* User-created files are owned by the unprivileged user principal. */
+    /* User-created files use the shared unprivileged /tmp namespace. */
     fd=vfs_open("/tmp/u.txt",VFS_O_WRITE|VFS_O_CREATE|VFS_O_TRUNCATE);
     assert(fd>=0 && vfs_write(fd,"user",4)==4 && vfs_close(fd)==0);
     active_task_id=4;
