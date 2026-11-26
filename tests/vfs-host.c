@@ -117,12 +117,12 @@ int main(void) {
 
     /* Process exit closes owned handles and commits completed file writes. */
     active_task_id=3;
-    fd=vfs_open("/exit.txt",VFS_O_WRITE|VFS_O_CREATE|VFS_O_TRUNCATE);
+    fd=vfs_open("/tmp/exit.txt",VFS_O_WRITE|VFS_O_CREATE|VFS_O_TRUNCATE);
     assert(fd>=0 && vfs_write(fd,"saved",5)==5);
     active_task_id=4;
     vfs_close_task(3);
     active_task_id=0;
-    assert(vfs_read_all("/exit.txt",buffer,sizeof(buffer),0)==5);
+    assert(vfs_read_all("/tmp/exit.txt",buffer,sizeof(buffer),0)==5);
     assert(strcmp(buffer,"saved")==0);
 
     /* Invalid device opens must not consume a descriptor. */
@@ -164,13 +164,13 @@ int main(void) {
     assert(vfs_rename("/root-owned.txt","/renamed.txt")<0);
 
     /* User-created files are owned by the unprivileged user principal. */
-    fd=vfs_open("/user-owned.txt",VFS_O_WRITE|VFS_O_CREATE|VFS_O_TRUNCATE);
+    fd=vfs_open("/tmp/u.txt",VFS_O_WRITE|VFS_O_CREATE|VFS_O_TRUNCATE);
     assert(fd>=0 && vfs_write(fd,"user",4)==4 && vfs_close(fd)==0);
     active_task_id=4;
-    assert(vfs_read_all("/user-owned.txt",buffer,sizeof(buffer),0)==4);
+    assert(vfs_read_all("/tmp/u.txt",buffer,sizeof(buffer),0)==4);
     assert(strcmp(buffer,"user")==0);
     active_task_id=3;
-    assert(vfs_unlink("/user-owned.txt")==0);
+    assert(vfs_unlink("/tmp/u.txt")==0);
 
     /* Existing system directories remain non-writable to user processes. */
     active_task_id=0;
